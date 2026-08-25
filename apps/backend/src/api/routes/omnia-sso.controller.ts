@@ -67,9 +67,10 @@ export class OmniaSsoController {
       throw new HttpException('tenantId and a valid email are required', HttpStatus.BAD_REQUEST);
     }
 
-    let user = await this._users.getUserByEmail(email);
+    const existing = await this._users.getUserByEmail(email);
+    let userId: string | undefined = existing?.id;
     let created = false;
-    if (!user) {
+    if (!userId) {
       // One studio workspace per platform user, named after the tenant. No
       // password: `comparePassword` can never match an empty hash.
       const company = (body?.tenantName || `Omnia ${tenantId.slice(0, 8)}`)
@@ -88,12 +89,12 @@ export class OmniaSsoController {
         ip,
         userAgent
       );
-      user = org.users[0].user;
+      userId = org.users[0].user.id;
       created = true;
     }
 
     const ticket = AuthChecker.signJWT({
-      omniaLogin: user.id,
+      omniaLogin: userId,
       tenantId,
       exp: dayjs().add(TICKET_SECONDS, 'seconds').unix(),
     });
@@ -124,7 +125,8 @@ export class OmniaSsoController {
     }
 
     // Mirror of AuthService.jwt(): the session token is the user without the hash.
-    const { password: _omit, ...safeUser } = user as typeof user & { password?: string };
+    const safeUser: Record<string, unknown> = { ...user };
+    delete safeUser.password;
     const jwt = AuthChecker.signJWT(safeUser);
     response.cookie('auth', jwt, {
       domain: getCookieUrlFromDomain(front),

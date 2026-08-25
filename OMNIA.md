@@ -20,6 +20,8 @@ studio**: the social-publishing module of the Omnia automation platform.
 | Colours | `app/colors.scss` tokens + hard-coded purple/pink literals → Omnia blue `#1E56E8`, navy `#0A1F5C`, bg `#06070A`, surface `#0E1118`, paper `#FBFAF7` |
 | Fonts | Plus Jakarta Sans → Inter; Instrument Serif as `--font-display` |
 | Developers tab (`.2`–`.4`) | `components/public-api/public.component.tsx`, `components/developer/developer.component.tsx`: the upstream CLI / MCP / skill instructions and the Docs / N8N buttons are removed (they name the `postiz` npm package, MCP key and docs site); the API key and OAuth-app sections stay |
+| Session bridge (`.5`) | `apps/backend/src/api/routes/omnia-sso.controller.ts`: `POST /auth/omnia/session` (header `x-omnia-sso-secret`, body `{tenantId, tenantName, email}`) finds or creates a password-less studio user in a workspace named after the tenant and returns a 120-second login URL; `GET /auth/omnia/login?ticket=` sets the `auth` cookie and redirects to `/launches`. Off unless `OMNIA_SSO_SECRET` is set |
+| nginx (`.5`) | `var/docker/nginx.conf`: upstreams pinned to `127.0.0.1` with `max_fails=0` — `localhost` resolved to `::1` first and a burst of chunk requests ended in "no live upstreams" |
 | Sign-in routing (`.2`) | `src/proxy.ts`: with `DISABLE_REGISTRATION=true` an unauthenticated visitor goes to `/auth/login`, not the disabled Register page — the platform console embeds `/launches` |
 
 Untouched on purpose: internal identifiers (`agent="postiz"`, the `postiz` MCP key, `POSTIZ_*` env

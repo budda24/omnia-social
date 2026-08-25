@@ -6,7 +6,8 @@ studio**: the social-publishing module of the Omnia automation platform.
 
 - `main` — untouched mirror of upstream. Never commit here.
 - `omnia-brand` — upstream release tag + a short series of branding commits. `git log v2.23.0..omnia-brand`
-  *is* the patch set. Build tags are `v<upstream>-omnia.<n>` (e.g. `v2.23.0-omnia.1`).
+  *is* the patch set. Build tags are `v<upstream>-omnia.<n>` (`v2.23.0-omnia.4` is what the platform pins); the
+  branch tip may carry docs-only commits past the newest tag.
 
 ## What the branding commits change (and what they leave alone)
 
@@ -18,6 +19,8 @@ studio**: the social-publishing module of the Omnia automation platform.
 | Visible strings | the word "Postiz" in user-facing copy → "Omnia Social" (components + all 16 locales) |
 | Colours | `app/colors.scss` tokens + hard-coded purple/pink literals → Omnia blue `#1E56E8`, navy `#0A1F5C`, bg `#06070A`, surface `#0E1118`, paper `#FBFAF7` |
 | Fonts | Plus Jakarta Sans → Inter; Instrument Serif as `--font-display` |
+| Developers tab (`.2`–`.4`) | `components/public-api/public.component.tsx`, `components/developer/developer.component.tsx`: the upstream CLI / MCP / skill instructions and the Docs / N8N buttons are removed (they name the `postiz` npm package, MCP key and docs site); the API key and OAuth-app sections stay |
+| Sign-in routing (`.2`) | `src/proxy.ts`: with `DISABLE_REGISTRATION=true` an unauthenticated visitor goes to `/auth/login`, not the disabled Register page — the platform console embeds `/launches` |
 
 Untouched on purpose: internal identifiers (`agent="postiz"`, the `postiz` MCP key, `POSTIZ_*` env
 names, `@gitroom/*` package names, the `postiz://` deep-link scheme), backend code, integrations.

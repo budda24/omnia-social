@@ -11,7 +11,8 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { Provider } from '@prisma/client';
-import { timingSafeEqual } from 'crypto';
+import { randomBytes, timingSafeEqual } from 'crypto';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import dayjs from 'dayjs';
 import { RealIP } from 'nestjs-real-ip';
 import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
@@ -96,6 +97,7 @@ export class OmniaSsoController {
     const ticket = AuthChecker.signJWT({
       omniaLogin: userId,
       tenantId,
+      jti: randomBytes(16).toString('hex'),
       exp: dayjs().add(TICKET_SECONDS, 'seconds').unix(),
     });
     return {
@@ -111,13 +113,24 @@ export class OmniaSsoController {
     if (!process.env.OMNIA_SSO_SECRET || !ticket) {
       return response.redirect(`${front}/auth/login`);
     }
-    let payload: { omniaLogin?: string };
+    let payload: { omniaLogin?: string; jti?: string };
     try {
-      payload = AuthChecker.verifyJWT(ticket) as { omniaLogin?: string };
+      payload = AuthChecker.verifyJWT(ticket) as { omniaLogin?: string; jti?: string };
     } catch (err) {
       return response
         .status(HttpStatus.UNAUTHORIZED)
         .send('This Omnia login link is invalid or has expired. Open the Social tab again.');
+    }
+    // Single use: the first redemption claims the ticket id for as long as the
+    // ticket could still verify; a replay within that window is refused.
+    if (!payload?.jti) {
+      return response.status(HttpStatus.UNAUTHORIZED).send('This Omnia login link is missing its id.');
+    }
+    const claimed = await ioRedis.set(`omnia-ticket:${payload.jti}`, '1', 'EX', TICKET_SECONDS + 5, 'NX');
+    if (claimed !== 'OK') {
+      return response
+        .status(HttpStatus.UNAUTHORIZED)
+        .send('This Omnia login link was already used. Open the Social tab again.');
     }
     const user = payload?.omniaLogin ? await this._users.getUserById(payload.omniaLogin) : null;
     if (!user) {

@@ -700,9 +700,9 @@ const PublicApiContent = () => {
         </div>
       </div>
 
-      <CliSection apiKey={user.publicApi} />
+      {/* Omnia: the upstream CLI / MCP / skill instructions reference the `postiz` npm package and MCP key — dropped in the fork; the API key + OAuth apps stay. */}
 
-      <McpSection user={user} mcpBase={mcpBase} />
+      
     </div>
   );
 };

@@ -101,7 +101,7 @@ export async function proxy(request: NextRequest) {
           : findIndex
         ).toUpperCase()}`;
     return NextResponse.redirect(
-      new URL(`/auth${url}${additional}`, nextUrl.href)
+      new URL(`${process.env.DISABLE_REGISTRATION === 'true' ? '/auth/login' : '/auth'}${url}${additional}`, nextUrl.href)
     );
   }
 

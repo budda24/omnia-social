@@ -55,3 +55,6 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   Env: `FRONTEND_URL=<origin>/social`, `NEXT_PUBLIC_BACKEND_URL=<origin>/social/api`, `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY=/social/uploads`.
 - `v2.23.0-omnia.9` — the dynamic icon templates (`/icons/platforms/<id>.png`, `/icons/third-party/<id>.png`,
   27 sites on raw `<img>`s) carry the base path too — found by the card's Refuter with the channel picker open.
+- `v2.23.0-omnia.10` — connecting a channel from inside the dashboard frame: providers refuse to be framed
+  (`X-Frame-Options: DENY` from facebook.com), so the OAuth dialog opens in a popup (`omnia-oauth`) and the popup
+  closes itself when it lands back on the studio (`omnia.popup.component.tsx`); the frame then reloads.

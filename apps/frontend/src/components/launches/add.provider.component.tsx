@@ -521,6 +521,23 @@ export const AddProviderComponent: FC<{
             return;
           }
 
+          // Omnia: the studio runs inside the dashboard's frame. Providers refuse to be framed
+          // (X-Frame-Options: DENY), so the OAuth dialog opens in a popup; when it finishes
+          // (the popup lands back on the studio and closes itself — see
+          // omnia.popup.component.tsx) the frame reloads with the new channel.
+          if (window.self !== window.top) {
+            const popup = window.open(url, 'omnia-oauth', 'popup=yes,width=680,height=800');
+            if (popup) {
+              const tick = window.setInterval(() => {
+                if (popup.closed) {
+                  window.clearInterval(tick);
+                  window.location.reload();
+                }
+              }, 500);
+              return;
+            }
+          }
+
           window.location.href = url;
         };
         if (isWeb3) {

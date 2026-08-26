@@ -149,19 +149,19 @@ export const SelectCurrent: FC = () => {
                 )}
               >
                 <SafeImage
-                  src={integration.picture || '/no-picture.jpg'}
+                  src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                   className="rounded-full min-w-[26px]"
                   alt={integration.identifier}
                   width={26}
                   height={26}
                   onError={(e) => {
-                    e.currentTarget.src = '/no-picture.jpg';
-                    e.currentTarget.srcset = '/no-picture.jpg';
+                    e.currentTarget.src = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg';
+                    e.currentTarget.srcset = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg';
                   }}
                 />
                 {integration.identifier === 'youtube' ? (
                   <img
-                    src="/icons/platforms/youtube.svg"
+                    src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/icons/platforms/youtube.svg"}
                     className="absolute z-10 bottom-[2px] end-[2px] min-w-[12px]"
                     width={12}
                   />

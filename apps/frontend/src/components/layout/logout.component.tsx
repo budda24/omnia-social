@@ -28,7 +28,7 @@ export const LogoutComponent: FC<{ isIcon?: boolean }> = ({ isIcon }) => {
           method: 'POST',
         });
       }
-      window.location.href = '/';
+      window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/';
     }
   }, []);
   return (

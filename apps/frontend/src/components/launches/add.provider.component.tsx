@@ -453,7 +453,7 @@ export const AddProviderComponent: FC<{
               >
                 <Web3Providers
                   onComplete={(code, newState) => {
-                    window.location.href = `/integrations/social/${identifier}?code=${code}&state=${newState}${
+                    window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + `/integrations/social/${identifier}?code=${code}&state=${newState}${
                       onboarding ? '&onboarding=true' : ''
                     }`;
                   }}
@@ -613,7 +613,7 @@ export const AddProviderComponent: FC<{
               )
             ).json();
             modal.closeAll();
-            window.location.href = `/integrations/social/${identifier}?state=${url}&code=${Buffer.from(
+            window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + `/integrations/social/${identifier}?state=${url}&code=${Buffer.from(
               JSON.stringify(cookieResponse.cookies)
             ).toString('base64')}${onboarding ? '&onboarding=true' : ''}`;
           } catch {
@@ -719,7 +719,7 @@ export const AddProviderComponent: FC<{
               >
                 <div>
                   {item.identifier === 'youtube' ? (
-                    <img src={`/icons/platforms/youtube.svg`} />
+                    <img src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + '/icons/platforms/youtube.svg'} />
                   ) : (
                     <img
                       className={clsx(

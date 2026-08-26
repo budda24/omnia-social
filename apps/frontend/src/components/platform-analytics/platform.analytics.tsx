@@ -147,7 +147,7 @@ export const PlatformAnalytics = () => {
     return (
       <div className="bg-newBgColorInner p-[20px] flex flex-col gap-[15px] transition-all flex-1 justify-center items-center text-center">
         <div>
-          <img src="/peoplemarketplace.svg" />
+          <img src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/peoplemarketplace.svg"} />
         </div>
         <div className="text-[48px]">
           {t('can_t_show_analytics_yet', "Can't show analytics yet")}

@@ -42,7 +42,7 @@ export const GoogleTagManagerComponent: FC<{ gtmId?: string }> = ({
   }
   return (
     <>
-      <Script src="/g.js" strategy="afterInteractive" />
+      <Script src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/g.js"} strategy="afterInteractive" />
 
       <Script id="google-ads-gtag" strategy="afterInteractive">
         {`

@@ -289,8 +289,8 @@ export const MenuComponent: FC<
           </div>
         )}
         <ImageWithFallback
-          fallbackSrc={'/no-picture.jpg'}
-          src={integration.picture || '/no-picture.jpg'}
+          fallbackSrc={(process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
+          src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
           className="rounded-[8px] min-w-[36px] min-h-[36px]"
           alt={integration.identifier}
           width={36}
@@ -298,7 +298,7 @@ export const MenuComponent: FC<
         />
         {integration.identifier === 'youtube' ? (
           <img
-            src="/icons/platforms/youtube.svg"
+            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/icons/platforms/youtube.svg"}
             className="absolute z-10 bottom-[5px] -end-[5px]"
             width={20}
           />
@@ -551,8 +551,8 @@ export const LaunchesComponent = () => {
                     <img
                       src={
                         mode === 'dark'
-                          ? '/no-channels.svg'
-                          : '/no-channels-colors.svg'
+                          ? (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-channels.svg'
+                          : (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-channels-colors.svg'
                       }
                       alt="No channels"
                       className="mx-auto min-w-[100%]"

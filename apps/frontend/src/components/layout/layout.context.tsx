@@ -55,7 +55,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
         setCookie('auth', '', -10);
         setCookie('showorg', '', -10);
         setCookie('impersonate', '', -10);
-        window.location.href = '/';
+        window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/';
         return true;
       }
       const reloadOrOnboarding =
@@ -86,7 +86,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
           setCookie('showorg', '', -10);
           setCookie('impersonate', '', -10);
         }
-        window.location.href = '/';
+        window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/';
       }
       if (response.status === 406) {
         if (

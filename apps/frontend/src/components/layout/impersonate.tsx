@@ -802,7 +802,7 @@ const AddTeamMember = () => {
 const ViewErrors = () => {
   const t = useT();
   const handleClick = useCallback(() => {
-    window.location.href = '/admin/errors';
+    window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/admin/errors';
   }, []);
   return (
     <div
@@ -817,7 +817,7 @@ const ViewErrors = () => {
 const ViewStats = () => {
   const t = useT();
   const handleClick = useCallback(() => {
-    window.location.href = '/admin/stats';
+    window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/admin/stats';
   }, []);
   return (
     <div

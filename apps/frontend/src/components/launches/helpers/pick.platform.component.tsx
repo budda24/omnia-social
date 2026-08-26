@@ -245,7 +245,7 @@ export const PickPlatforms: FC<{
                         )}
                       >
                         <SafeImage
-                          src={integration.picture || '/no-picture.jpg'}
+                          src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                           className="rounded-full"
                           alt={integration.identifier}
                           width={32}
@@ -253,7 +253,7 @@ export const PickPlatforms: FC<{
                         />
                         {integration.identifier === 'youtube' ? (
                           <img
-                            src="/icons/platforms/youtube.svg"
+                            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/icons/platforms/youtube.svg"}
                             className="absolute z-10 bottom-0 -end-[5px]"
                             width={20}
                           />
@@ -284,7 +284,7 @@ export const PickPlatforms: FC<{
                         <div className="flex items-center justify-center gap-[10px]">
                           <div className="relative">
                             <img
-                              src={integration.picture || '/no-picture.jpg'}
+                              src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                               className="rounded-full"
                               alt={integration.identifier}
                               width={24}

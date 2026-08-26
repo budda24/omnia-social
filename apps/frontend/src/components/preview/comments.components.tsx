@@ -112,7 +112,7 @@ export const CommentsComponents: FC<{
 
   const { postId } = props;
   const goToComments = useCallback(() => {
-    window.location.href = `/auth?returnUrl=${window.location.href}`;
+    window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + `/auth?returnUrl=${window.location.href}`;
   }, []);
   if (!user?.id) {
     return (

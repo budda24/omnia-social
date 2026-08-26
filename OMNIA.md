@@ -47,3 +47,9 @@ docker build -f Dockerfile.dev --build-arg NEXT_PUBLIC_VERSION=v2.23.0-omnia.1 -
 The platform repo's `social/build.sh` does exactly this; `social/docker-compose.yml` runs it.
 
 - `v2.23.0-omnia.7` — SSO bridge users are bound to their platform tenant (`providerId = omnia:<tenantId>`); a foreign e-mail is refused (409); login tickets must carry `jti`, `exp` and `tenantId` and must match the user's binding.
+- `v2.23.0-omnia.8` — the studio is served under the dashboard's own origin at **`/social`** (Franek: "it has to be
+  a module in the Omnia dashboard, not a separate page"). Next.js `basePath` from `NEXT_PUBLIC_BASE_PATH` (baked at
+  build, default `/social` in `Dockerfile.dev`); `proxy.ts` redirects, raw `<img>/<link>/<Script>` paths and
+  `window.location.href` assignments carry the prefix (`<Link>` is basePath-aware already); nginx routes
+  `/social/api/` → backend, `/social/uploads/`, `/social/` → frontend, `/` → 302 `/social/`.
+  Env: `FRONTEND_URL=<origin>/social`, `NEXT_PUBLIC_BACKEND_URL=<origin>/social/api`, `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY=/social/uploads`.

@@ -18,7 +18,7 @@ export const PreConditionComponentModal: FC = () => {
       </div>
       <div className="flex gap-[2px] justify-center">
         <Button
-          onClick={() => (window.location.href = '/billing?finishTrial=true')}
+          onClick={() => (window.location.href = (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/billing?finishTrial=true')}
         >
           Fast track - Charge me now
         </Button>

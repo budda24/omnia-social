@@ -125,7 +125,7 @@ export const FacebookPreview: FC<{
       <div className="flex gap-[8px]">
         <div className="w-[36px] h-[36px]">
           <img
-            src={integration?.picture || '/no-picture.jpg'}
+            src={integration?.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
             alt="social"
             className="rounded-full relative z-[2] w-[36px] h-[36px]"
           />
@@ -280,7 +280,7 @@ export const FacebookPreview: FC<{
               <div className="flex gap-[6px] leading-[17px]">
                 <div className="h-[34px]">
                   <img
-                    src={integration?.picture || '/no-picture.jpg'}
+                    src={integration?.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                     alt="social"
                     className="rounded-full relative z-[2] h-[34px] w-[34px]"
                   />

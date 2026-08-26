@@ -131,7 +131,7 @@ export const FirstBillingComponent = () => {
             <div>
               <SafeImage
                 className="text-[12px]"
-                src="/icons/platforms/youtube.svg"
+                src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/icons/platforms/youtube.svg"}
                 width={22.5}
                 height={16}
                 alt="YouTube"

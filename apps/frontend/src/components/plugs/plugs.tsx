@@ -96,7 +96,7 @@ export const Plugs = () => {
     return (
       <div className="bg-newBgColorInner p-[20px] flex flex-1 flex-col gap-[15px] transition-all items-center justify-center">
         <div>
-          <img src="/peoplemarketplace.svg" />
+          <img src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/peoplemarketplace.svg"} />
         </div>
         <div className="text-[48px]">
           {t(

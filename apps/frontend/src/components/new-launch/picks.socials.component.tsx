@@ -67,7 +67,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
                   >
                     <ImageWithFallback
                       fallbackSrc="/no-picture.jpg"
-                      src={integration.picture || '/no-picture.jpg'}
+                      src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                       className={clsx(
                         'rounded-full transition-all min-w-[42px] border-[1.5px] min-h-[42px]',
                         selectedIntegrations.findIndex(
@@ -82,7 +82,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
                     />
                     {integration.identifier === 'youtube' ? (
                       <img
-                        src="/icons/platforms/youtube.svg"
+                        src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/icons/platforms/youtube.svg"}
                         className="absolute z-10 bottom-0 -end-[5px] min-w-[16px]"
                         width={16}
                       />

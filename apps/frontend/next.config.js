@@ -3,6 +3,8 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Omnia: the studio is served under the dashboard's own origin (…/social). Build-time.
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
   experimental: {
     proxyTimeout: 90_000,
   },

@@ -129,7 +129,7 @@ const RedditPreview: FC = (props) => {
                       <SafeImage
                         width={24}
                         height={24}
-                        src={`/icons/platforms/${integration?.identifier!}.png`}
+                        src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration?.identifier!}.png`}
                         alt="x"
                         className="rounded-full absolute -end-[5px] -bottom-[5px] z-[2]"
                       />

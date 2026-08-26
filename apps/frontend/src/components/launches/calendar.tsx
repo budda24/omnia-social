@@ -952,7 +952,7 @@ export const CalendarColumn: FC<{
                           />
                         ) : (
                           <SafeImage
-                            src={`/icons/platforms/${selectedIntegrations.identifier}.png`}
+                            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${selectedIntegrations.identifier}.png`}
                             className="rounded-[8px] absolute z-10 -bottom-[5px] -end-[5px] border border-fifth"
                             alt={selectedIntegrations.identifier}
                             width={20}
@@ -1154,7 +1154,7 @@ const CalendarItem: FC<{
           />
           <img
             className="w-[12px] h-[12px] rounded-[8px] absolute z-10 top-[10px] end-0 border border-fifth"
-            src={`/icons/platforms/${post.integration?.providerIdentifier}.png`}
+            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${post.integration?.providerIdentifier}.png`}
           />
         </div>
         <div className="w-full flex-1 flex flex-col min-h-[40px]">

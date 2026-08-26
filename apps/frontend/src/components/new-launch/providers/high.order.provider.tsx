@@ -307,7 +307,7 @@ export const withProvider = function <T extends object>(params: {
                           width={16}
                           height={16}
                           className="rounded-[16px] min-w-[16px] min-h-[16px] w-[16px] h-[16px] absolute bottom-0 end-0"
-                          src={`/icons/platforms/${selectedIntegration?.integration.identifier}.png`}
+                          src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${selectedIntegration?.integration.identifier}.png`}
                         />
                       </div>
                       <div className="text-[20px]">{selectedIntegration?.integration.name}</div>

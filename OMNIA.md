@@ -53,3 +53,5 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   `window.location.href` assignments carry the prefix (`<Link>` is basePath-aware already); nginx routes
   `/social/api/` → backend, `/social/uploads/`, `/social/` → frontend, `/` → 302 `/social/`.
   Env: `FRONTEND_URL=<origin>/social`, `NEXT_PUBLIC_BACKEND_URL=<origin>/social/api`, `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY=/social/uploads`.
+- `v2.23.0-omnia.9` — the dynamic icon templates (`/icons/platforms/<id>.png`, `/icons/third-party/<id>.png`,
+  27 sites on raw `<img>`s) carry the base path too — found by the card's Refuter with the channel picker open.

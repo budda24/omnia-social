@@ -727,7 +727,7 @@ export const AddProviderComponent: FC<{
                         item.identifier !== 'google_my_business' &&
                           'rounded-full'
                       )}
-                      src={`/icons/platforms/${item.identifier}.png`}
+                      src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${item.identifier}.png`}
                     />
                   )}
                 </div>

@@ -230,7 +230,7 @@ export const ImportDebugPostModal: FC<{ close: () => void }> = ({ close }) => {
                       {integration.name}
                     </div>
                     <img
-                      src={`/icons/platforms/${integration.identifier}.png`}
+                      src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration.identifier}.png`}
                       className="w-[14px] h-[14px] rounded-[4px] ml-auto"
                       alt={integration.identifier}
                     />

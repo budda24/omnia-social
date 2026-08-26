@@ -129,7 +129,7 @@ export default async function Auth(
                         <img
                           className="w-full h-full bg-black aspect-square rounded-full border-tableBorder"
                           alt={post[0].integration.providerIdentifier}
-                          src={`/icons/platforms/${post[0].integration.providerIdentifier}.png`}
+                          src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${post[0].integration.providerIdentifier}.png`}
                         />
                       </div>
                     </div>

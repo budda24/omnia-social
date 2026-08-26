@@ -181,7 +181,7 @@ const OnboardingStep1: FC<{ onNext: () => void; onSkip: () => void }> = ({
                     height={28}
                   />
                   <SafeImage
-                    src={`/icons/platforms/${integration.identifier}.png`}
+                    src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration.identifier}.png`}
                     className="rounded-full absolute -bottom-[3px] -end-[3px] border border-fifth"
                     alt={integration.identifier}
                     width={14}

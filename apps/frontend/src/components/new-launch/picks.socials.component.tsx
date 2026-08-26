@@ -88,7 +88,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
                       />
                     ) : (
                       <SafeImage
-                        src={`/icons/platforms/${integration.identifier}.png`}
+                        src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration.identifier}.png`}
                         className="rounded-[4px] absolute z-10 bottom-0 -end-[5px] min-w-[16px] min-h-[16px]"
                         alt={integration.identifier}
                         width={16}

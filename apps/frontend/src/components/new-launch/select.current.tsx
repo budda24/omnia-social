@@ -167,7 +167,7 @@ export const SelectCurrent: FC = () => {
                   />
                 ) : (
                   <SafeImage
-                    src={`/icons/platforms/${integration.identifier}.png`}
+                    src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration.identifier}.png`}
                     className="min-w-[12px] min-h-[12px] rounded-[3px] absolute z-10 bottom-[6px] end-[6px]"
                     alt={integration.identifier}
                     width={12}

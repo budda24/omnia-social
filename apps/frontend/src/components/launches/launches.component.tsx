@@ -304,7 +304,7 @@ export const MenuComponent: FC<
           />
         ) : (
           <SafeImage
-            src={`/icons/platforms/${integration.identifier}.png`}
+            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration.identifier}.png`}
             className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-fifth"
             alt={integration.identifier}
             width={18.41}

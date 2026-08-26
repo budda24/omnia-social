@@ -225,7 +225,7 @@ export const InformationComponent: FC<{
                 <Fragment key={p.integration.id}>
                   <div>
                     <SafeImage
-                      src={`/icons/platforms/${p.integration.identifier}.png`}
+                      src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${p.integration.identifier}.png`}
                       alt={p.integration.name}
                       className="rounded-[4px] w-[16px] h-[16px] min-w-[16px] min-h-[16px]"
                       width={16}

@@ -172,8 +172,8 @@ export const ThirdPartyComponent = () => {
                         data-tooltip-content={p.title}
                       >
                         <ImageWithFallback
-                          fallbackSrc={`/icons/third-party/${p.identifier}.png`}
-                          src={`/icons/third-party/${p.identifier}.png`}
+                          fallbackSrc={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/third-party/${p.identifier}.png`}
+                          src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/third-party/${p.identifier}.png`}
                           className="rounded-full"
                           alt={p.title}
                           width={32}

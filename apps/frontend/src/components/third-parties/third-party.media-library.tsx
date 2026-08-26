@@ -214,7 +214,7 @@ const ThirdPartyMediaLibraryPicker: FC<{
           <div>
             <img
               className="w-[32px] h-[32px] rounded-full"
-              src={`/icons/third-party/${p.identifier}.png`}
+              src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/third-party/${p.identifier}.png`}
             />
           </div>
           <div className="whitespace-pre-wrap text-left text-lg">

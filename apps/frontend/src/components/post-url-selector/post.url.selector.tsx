@@ -181,7 +181,7 @@ export const PostSelector: FC<{
                             <img
                               className="w-[20px] h-[20px] rounded-full absolute z-10 -bottom-[5px] -end-[5px] border border-fifth"
                               src={
-                                `/icons/platforms/` +
+                                (process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/` +
                                 p?.integration?.providerIdentifier +
                                 '.png'
                               }

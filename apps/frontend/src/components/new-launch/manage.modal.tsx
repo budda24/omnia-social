@@ -115,7 +115,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       <div className="flex items-center gap-[10px]">
         <div className="relative">
           <img
-            src={`/icons/platforms/${currentIntegration.identifier}.png`}
+            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${currentIntegration.identifier}.png`}
             className="w-[20px] h-[20px] rounded-[4px]"
             alt={currentIntegration.identifier}
           />

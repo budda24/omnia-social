@@ -18,6 +18,7 @@ import { RealIP } from 'nestjs-real-ip';
 import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -38,7 +39,8 @@ const TICKET_SECONDS = 120;
 export class OmniaSsoController {
   constructor(
     private _users: UsersService,
-    private _organizations: OrganizationService
+    private _organizations: OrganizationService,
+    private _prisma: PrismaRepository<'user'>
   ) {}
 
   private secretMatches(given?: string) {
@@ -68,7 +70,20 @@ export class OmniaSsoController {
       throw new HttpException('tenantId and a valid email are required', HttpStatus.BAD_REQUEST);
     }
 
-    const existing = await this._users.getUserByEmail(email);
+    // A bridge user belongs to exactly one platform tenant: providerId is the
+    // binding. An e-mail that already has a studio account outside this tenant
+    // (a password sign-up, or another tenant) is never taken over.
+    const boundTo = `omnia:${tenantId}`;
+    const existing = await this._prisma.model.user.findFirst({
+      where: { email, providerName: Provider.LOCAL },
+      select: { id: true, providerId: true },
+    });
+    if (existing && existing.providerId !== boundTo) {
+      throw new HttpException(
+        'This e-mail belongs to a studio account outside this Omnia tenant.',
+        HttpStatus.CONFLICT
+      );
+    }
     let userId: string | undefined = existing?.id;
     let created = false;
     if (!userId) {
@@ -84,7 +99,7 @@ export class OmniaSsoController {
           email,
           password: '',
           provider: Provider.LOCAL,
-          providerId: '',
+          providerId: boundTo,
           datafast_visitor_id: '',
         } as Omit<CreateOrgUserDto, 'providerToken'>,
         ip,
@@ -113,9 +128,10 @@ export class OmniaSsoController {
     if (!process.env.OMNIA_SSO_SECRET || !ticket) {
       return response.redirect(`${front}/auth/login`);
     }
-    let payload: { omniaLogin?: string; jti?: string };
+    type Ticket = { omniaLogin?: string; jti?: string; tenantId?: string; exp?: number };
+    let payload: Ticket;
     try {
-      payload = AuthChecker.verifyJWT(ticket) as { omniaLogin?: string; jti?: string };
+      payload = AuthChecker.verifyJWT(ticket) as Ticket;
     } catch (err) {
       return response
         .status(HttpStatus.UNAUTHORIZED)
@@ -123,8 +139,8 @@ export class OmniaSsoController {
     }
     // Single use: the first redemption claims the ticket id for as long as the
     // ticket could still verify; a replay within that window is refused.
-    if (!payload?.jti) {
-      return response.status(HttpStatus.UNAUTHORIZED).send('This Omnia login link is missing its id.');
+    if (!payload?.jti || typeof payload.exp !== 'number' || !payload.tenantId) {
+      return response.status(HttpStatus.UNAUTHORIZED).send('This Omnia login link is incomplete.');
     }
     const claimed = await ioRedis.set(`omnia-ticket:${payload.jti}`, '1', 'EX', TICKET_SECONDS + 5, 'NX');
     if (claimed !== 'OK') {
@@ -133,7 +149,7 @@ export class OmniaSsoController {
         .send('This Omnia login link was already used. Open the Social tab again.');
     }
     const user = payload?.omniaLogin ? await this._users.getUserById(payload.omniaLogin) : null;
-    if (!user) {
+    if (!user || user.providerId !== `omnia:${payload.tenantId}`) {
       return response.status(HttpStatus.UNAUTHORIZED).send('This Omnia login link does not match a studio user.');
     }
 

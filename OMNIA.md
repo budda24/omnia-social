@@ -45,3 +45,5 @@ docker build -f Dockerfile.dev --build-arg NEXT_PUBLIC_VERSION=v2.23.0-omnia.1 -
 ```
 
 The platform repo's `social/build.sh` does exactly this; `social/docker-compose.yml` runs it.
+
+- `v2.23.0-omnia.7` — SSO bridge users are bound to their platform tenant (`providerId = omnia:<tenantId>`); a foreign e-mail is refused (409); login tickets must carry `jti`, `exp` and `tenantId` and must match the user's binding.

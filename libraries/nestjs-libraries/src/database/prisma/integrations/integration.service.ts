@@ -212,7 +212,9 @@ export class IntegrationService {
   }
 
   async refreshNeeded(org: string, id: string) {
-    return this._integrationRepository.refreshNeeded(org, id);
+    const out = await this._integrationRepository.refreshNeeded(org, id);
+    await this._omnia.mirrorChannelById(id);
+    return out;
   }
 
   async setBetweenRefreshSteps(id: string) {
@@ -291,7 +293,9 @@ export class IntegrationService {
   }
 
   async disableIntegrations(org: string, totalChannels: number) {
-    return this._integrationRepository.disableIntegrations(org, totalChannels);
+    const out = await this._integrationRepository.disableIntegrations(org, totalChannels);
+    await this._omnia.mirrorOrganization(org);
+    return out;
   }
 
   async checkForDeletedOnceAndUpdate(org: string, page: string) {
@@ -339,6 +343,8 @@ export class IntegrationService {
       token: getIntegrationInformation.access_token,
       profile: getIntegrationInformation.username,
     });
+    // Omnia (OMN-35): the page token is the credential that publishes — mirror it now.
+    await this._omnia.mirrorChannelById(id);
 
     return { success: true };
   }

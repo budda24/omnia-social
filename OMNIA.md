@@ -72,3 +72,7 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   (shared secret; best effort, never blocks the connect). Env: `OMNIA_PLATFORM_INTERNAL_URL`, `OMNIA_CONSOLE_URL`.
 - `v2.23.0-omnia.12` — the platform's live verdict on a session is no longer cached (was 15 s): a platform sign-out ends the
   studio session on the very next request. Dead verdicts still cached 60 s.
+- `v2.23.0-omnia.13` — found by the card's Refuter: page-based providers (`saveProviderPage`), `refreshNeeded` and the bulk
+  `disableIntegrations` now mirror too; a step-one user token of a page provider is never mirrored; the mirror retries
+  three times (~30 s) before giving up with an error log; a platform hiccup on the session check refuses the request
+  without caching the refusal.

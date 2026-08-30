@@ -76,3 +76,7 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   `disableIntegrations` now mirror too; a step-one user token of a page provider is never mirrored; the mirror retries
   three times (~30 s) before giving up with an error log; a platform hiccup on the session check refuses the request
   without caching the refusal.
+- `v2.23.0-omnia.14` — Refuter round 2: with the bridge configured **every** studio user must be `omnia:`-bound and hold a live
+  platform session — legacy password accounts (and their year-long cookies) are refused; the cron refresh failure,
+  `disconnectChannel` and the one-time-token sibling rotation (`rootInternalId`) mirror too; a login call without a
+  ticket lands on `/auth/login-required`.

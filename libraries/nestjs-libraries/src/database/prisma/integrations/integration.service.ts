@@ -142,7 +142,14 @@ export class IntegrationService {
     // Omnia (OMN-35): the credential is also stored in the platform vault so
     // other modules can reuse it. Never blocks the connect.
     if (saved && (saved as Integration).id) {
-      this._omnia.mirrorChannel(saved as Integration);
+      // One-time-token providers rotate every sibling that shares rootInternalId
+      // (repository updateMany): mirror the whole family, not just this row.
+      const root = (saved as Integration).rootInternalId;
+      if (oneTimeToken && root) {
+        await this._omnia.mirrorSiblings(org, root);
+      } else {
+        this._omnia.mirrorChannel(saved as Integration);
+      }
     }
     return saved;
   }
@@ -193,6 +200,7 @@ export class IntegrationService {
 
   async disconnectChannel(orgId: string, integration: Integration) {
     await this._integrationRepository.disconnectChannel(orgId, integration.id);
+    await this._omnia.mirrorChannelById(integration.id);
     await this.informAboutRefreshError(orgId, integration);
   }
 
@@ -235,10 +243,7 @@ export class IntegrationService {
           integration.organizationId,
           integration
         );
-        await this._integrationRepository.refreshNeeded(
-          integration.organizationId,
-          integration.id
-        );
+        await this.refreshNeeded(integration.organizationId, integration.id);
         return;
       }
 

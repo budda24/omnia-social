@@ -150,7 +150,7 @@ export class OmniaSsoController {
   async login(@Query('ticket') ticket: string, @Res() response: Response) {
     const front = process.env.FRONTEND_URL!;
     if (!process.env.OMNIA_SSO_SECRET || !ticket) {
-      return response.redirect(`${front}/auth/login`);
+      return response.redirect(`${front}/auth/login-required`);
     }
     type Ticket = {
       omniaLogin?: string;

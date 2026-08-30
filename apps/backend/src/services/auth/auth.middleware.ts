@@ -65,9 +65,15 @@ export class AuthMiddleware implements NestMiddleware {
       // platform session, or a platform that says no → the cookie is dropped
       // and the request is refused with 401 + `logout`, which the frontend
       // turns into the "sign in on Omnia" stop page. Never a studio login.
-      if ((user.providerId || '').startsWith('omnia:')) {
+      //
+      // With the bridge configured there is no other identity: a studio account
+      // that is not bound to a platform tenant (a password sign-up from before
+      // the login page was removed, still holding a year-long cookie) is refused
+      // the same way. Found by the card's Refuter — 8 such rows on the dev box.
+      if (OmniaPlatformService.configured) {
+        const bound = (user.providerId || '').startsWith('omnia:');
         const sid = (payload as unknown as { omniaSid?: string }).omniaSid;
-        if (!sid || !(await this._omnia.isSessionActive(sid))) {
+        if (!bound || !sid || !(await this._omnia.isSessionActive(sid))) {
           removeAuth(res);
           throw new HttpException('Omnia session ended', HttpStatus.UNAUTHORIZED);
         }

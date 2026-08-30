@@ -164,6 +164,15 @@ export class OmniaPlatformService {
     })();
   }
 
+  /** Every channel sharing a rootInternalId — one-time-token providers rotate them together. */
+  async mirrorSiblings(organizationId: string, rootInternalId: string) {
+    if (!OmniaPlatformService.configured) return;
+    const rows = await this._prisma.model.integration.findMany({
+      where: { organizationId, rootInternalId },
+    });
+    for (const row of rows) this.mirrorChannel(row);
+  }
+
   /** Every channel of an organization — for bulk state changes. */
   async mirrorOrganization(organizationId: string) {
     if (!OmniaPlatformService.configured) return;

@@ -65,8 +65,10 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   session-less visitor there. `POST /api/auth/omnia/session` now requires the platform session's `sid` and
   `expiresAt`; the ticket and the `auth` cookie carry `omniaSid` and expire with the platform session.
   `AuthMiddleware` re-checks `omniaSid` for every `omnia:`-bound user against
-  `GET $OMNIA_PLATFORM_INTERNAL_URL/api/social/studio-session/check` (`omnia.platform.service.ts`, Redis-cached
-  15 s live / 60 s dead) and answers 401 + `logout` (cookie dropped) when the platform no longer vouches for it.
+  `GET $OMNIA_PLATFORM_INTERNAL_URL/api/social/studio-session/check` (`omnia.platform.service.ts`; a live
+  verdict is never cached — sign-out ends the studio session on the next request — a dead one for 60 s) and answers 401 + `logout` (cookie dropped) when the platform no longer vouches for it.
   Channel credentials are mirrored to the platform vault: `IntegrationService.createOrUpdateIntegration`,
   `disableChannel`, `enableChannel`, `deleteChannel` → `POST $OMNIA_PLATFORM_INTERNAL_URL/api/social/channels`
   (shared secret; best effort, never blocks the connect). Env: `OMNIA_PLATFORM_INTERNAL_URL`, `OMNIA_CONSOLE_URL`.
+- `v2.23.0-omnia.12` — the platform's live verdict on a session is no longer cached (was 15 s): a platform sign-out ends the
+  studio session on the very next request. Dead verdicts still cached 60 s.

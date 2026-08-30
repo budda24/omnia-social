@@ -53,12 +53,16 @@ export class OmniaPlatformService {
    * True only when the platform says the session row still exists and has not
    * expired. Unreachable platform or missing config → false: a studio session
    * never outlives what the platform can vouch for.
+   *
+   * A live verdict is never cached: a platform sign-out must end the studio
+   * session on the very next request, not after a cache window. Only a dead
+   * verdict is remembered (sign-out is final), which keeps a stale frame from
+   * hammering the platform.
    */
   async isSessionActive(sid: string): Promise<boolean> {
     if (!OmniaPlatformService.configured || !sid) return false;
     const key = `omnia-session:${sid}`;
     const cached = await ioRedis.get(key);
-    if (cached === '1') return true;
     if (cached === '0') return false;
     let active = false;
     try {
@@ -73,8 +77,7 @@ export class OmniaPlatformService {
     } catch (err) {
       this.log.warn(`platform session check failed for ${sid}: ${(err as Error).message}`);
     }
-    // A live answer is good for 15 s; a dead one for 60 s (sign-out is final).
-    await ioRedis.set(key, active ? '1' : '0', 'EX', active ? 15 : 60);
+    if (!active) await ioRedis.set(key, '0', 'EX', 60);
     return active;
   }
 

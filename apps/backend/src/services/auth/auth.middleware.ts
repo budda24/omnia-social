@@ -7,6 +7,8 @@ import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/us
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
+import { OmniaPlatformService } from '@gitroom/nestjs-libraries/omnia/omnia.platform.service';
+import { HttpException, HttpStatus } from '@nestjs/common';
 
 export const removeAuth = (res: Response) => {
   res.cookie('auth', '', {
@@ -28,7 +30,8 @@ export const removeAuth = (res: Response) => {
 export class AuthMiddleware implements NestMiddleware {
   constructor(
     private _organizationService: OrganizationService,
-    private _userService: UsersService
+    private _userService: UsersService,
+    private _omnia: OmniaPlatformService
   ) {}
   async use(req: Request, res: Response, next: NextFunction) {
     const auth = req.headers.auth || req.cookies.auth;
@@ -54,6 +57,20 @@ export class AuthMiddleware implements NestMiddleware {
 
       if (!user.activated) {
         throw new HttpForbiddenException();
+      }
+
+      // OMN-35: a bridge user (providerId `omnia:<tenant>`) holds a session
+      // only while the platform session it projects exists. No `omniaSid` in
+      // the token (a cookie from before the bridge was bound), an expired
+      // platform session, or a platform that says no → the cookie is dropped
+      // and the request is refused with 401 + `logout`, which the frontend
+      // turns into the "sign in on Omnia" stop page. Never a studio login.
+      if ((user.providerId || '').startsWith('omnia:')) {
+        const sid = (payload as unknown as { omniaSid?: string }).omniaSid;
+        if (!sid || !(await this._omnia.isSessionActive(sid))) {
+          removeAuth(res);
+          throw new HttpException('Omnia session ended', HttpStatus.UNAUTHORIZED);
+        }
       }
 
       const impersonate = req.cookies.impersonate || req.headers.impersonate;
@@ -107,6 +124,9 @@ export class AuthMiddleware implements NestMiddleware {
       // @ts-expect-error
       req.org = setOrg;
     } catch (err) {
+      if (err instanceof HttpException && err.getStatus() === HttpStatus.UNAUTHORIZED) {
+        throw err;
+      }
       throw new HttpForbiddenException();
     }
     next();

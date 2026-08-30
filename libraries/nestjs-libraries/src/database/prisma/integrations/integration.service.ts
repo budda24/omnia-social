@@ -25,6 +25,7 @@ import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { TemporalService } from 'nestjs-temporal-core';
+import { OmniaPlatformService } from '@gitroom/nestjs-libraries/omnia/omnia.platform.service';
 
 dayjs.extend(utc);
 
@@ -38,7 +39,8 @@ export class IntegrationService {
     private _notificationService: NotificationService,
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _temporalService: TemporalService
+    private _temporalService: TemporalService,
+    private _omnia: OmniaPlatformService
   ) {}
 
   async changeActiveCron(orgId: string) {
@@ -119,7 +121,7 @@ export class IntegrationService {
           })
       : undefined;
 
-    return this._integrationRepository.createOrUpdateIntegration(
+    const saved = await this._integrationRepository.createOrUpdateIntegration(
       additionalSettings,
       oneTimeToken,
       org,
@@ -137,6 +139,12 @@ export class IntegrationService {
       timezone,
       customInstanceDetails
     );
+    // Omnia (OMN-35): the credential is also stored in the platform vault so
+    // other modules can reuse it. Never blocks the connect.
+    if (saved && (saved as Integration).id) {
+      this._omnia.mirrorChannel(saved as Integration);
+    }
+    return saved;
   }
 
   updateIntegrationGroup(org: string, id: string, group: string) {
@@ -251,7 +259,9 @@ export class IntegrationService {
   }
 
   async disableChannel(org: string, id: string) {
-    return this._integrationRepository.disableChannel(org, id);
+    const out = await this._integrationRepository.disableChannel(org, id);
+    await this._omnia.mirrorChannelById(id);
+    return out;
   }
 
   async enableChannel(org: string, totalChannels: number, id: string) {
@@ -265,7 +275,9 @@ export class IntegrationService {
       throw new Error('You have reached the maximum number of channels');
     }
 
-    return this._integrationRepository.enableChannel(org, id);
+    const out = await this._integrationRepository.enableChannel(org, id);
+    await this._omnia.mirrorChannelById(id);
+    return out;
   }
 
   async getPostsForChannel(org: string, id: string) {
@@ -273,7 +285,9 @@ export class IntegrationService {
   }
 
   async deleteChannel(org: string, id: string) {
-    return this._integrationRepository.deleteChannel(org, id);
+    const out = await this._integrationRepository.deleteChannel(org, id);
+    await this._omnia.mirrorChannelById(id);
+    return out;
   }
 
   async disableIntegrations(org: string, totalChannels: number) {

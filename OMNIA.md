@@ -58,3 +58,15 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
 - `v2.23.0-omnia.10` — connecting a channel from inside the dashboard frame: providers refuse to be framed
   (`X-Frame-Options: DENY` from facebook.com), so the OAuth dialog opens in a popup (`omnia-oauth`) and the popup
   closes itself when it lands back on the studio (`omnia.popup.component.tsx`); the frame then reloads.
+- `v2.23.0-omnia.11` — **the platform is the only identity** (OMN-35). The studio's own sign-in is removed, not
+  hidden: `auth.controller.ts` (`/api/auth/{login,register,forgot,forgot-return,activate,can-register,oauth/*}`)
+  and the `/auth/{login,register,forgot,activate}` pages + their components are deleted; `/auth/login-required` is the
+  one page left — a stop page linking to `OMNIA_CONSOLE_URL` (`target=_top`) — and `proxy.ts` sends every
+  session-less visitor there. `POST /api/auth/omnia/session` now requires the platform session's `sid` and
+  `expiresAt`; the ticket and the `auth` cookie carry `omniaSid` and expire with the platform session.
+  `AuthMiddleware` re-checks `omniaSid` for every `omnia:`-bound user against
+  `GET $OMNIA_PLATFORM_INTERNAL_URL/api/social/studio-session/check` (`omnia.platform.service.ts`, Redis-cached
+  15 s live / 60 s dead) and answers 401 + `logout` (cookie dropped) when the platform no longer vouches for it.
+  Channel credentials are mirrored to the platform vault: `IntegrationService.createOrUpdateIntegration`,
+  `disableChannel`, `enableChannel`, `deleteChannel` → `POST $OMNIA_PLATFORM_INTERNAL_URL/api/social/channels`
+  (shared secret; best effort, never blocks the connect). Env: `OMNIA_PLATFORM_INTERNAL_URL`, `OMNIA_CONSOLE_URL`.

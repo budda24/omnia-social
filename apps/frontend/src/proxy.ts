@@ -63,10 +63,11 @@ export async function proxy(request: NextRequest) {
     return topResponse;
   }
 
-  // If the URL is logout, delete the cookie and redirect to login
+  // Omnia: the studio has no login page (OMN-35). Logout drops the cookie and
+  // stops on the page that points at the platform's sign-in.
   if (nextUrl.href.indexOf('/auth/logout') > -1) {
     const response = NextResponse.redirect(
-      new URL(`${BP}/auth/login`, nextUrl.href)
+      new URL(`${BP}/auth/login-required`, nextUrl.href)
     );
     response.cookies.set('auth', '', {
       path: '/',
@@ -83,13 +84,6 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (
-    nextUrl.pathname.startsWith('/auth/register') &&
-    process.env.DISABLE_REGISTRATION === 'true'
-  ) {
-    return NextResponse.redirect(new URL(`${BP}/auth/login`, nextUrl.href));
-  }
-
   const org = nextUrl.searchParams.get('org');
   const url = new URL(nextUrl).search;
   if (!nextUrl.pathname.startsWith('/auth') && !authCookie) {
@@ -104,8 +98,9 @@ export async function proxy(request: NextRequest) {
             : 'github'
           : findIndex
         ).toUpperCase()}`;
+    // Omnia: no session → the stop page, never a studio login form.
     return NextResponse.redirect(
-      new URL(`${BP}${process.env.DISABLE_REGISTRATION === 'true' ? '/auth/login' : '/auth'}${url}${additional}`, nextUrl.href)
+      new URL(`${BP}/auth/login-required${url}${additional}`, nextUrl.href)
     );
   }
 

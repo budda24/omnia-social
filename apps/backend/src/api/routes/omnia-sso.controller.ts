@@ -22,6 +22,7 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
+import { OmniaPlatformService } from '@gitroom/nestjs-libraries/omnia/omnia.platform.service';
 
 const TICKET_SECONDS = 120;
 
@@ -34,13 +35,20 @@ const TICKET_SECONDS = 120;
  * sets its own `auth` cookie exactly as `/auth/login` would and lands on the
  * calendar. Studio users created this way have no password: the platform
  * session is the only way in. Disabled unless OMNIA_SSO_SECRET is set.
+ *
+ * OMN-35: the studio session is a projection of the platform session and
+ * nothing else. The platform names its session (`sid`) and its expiry
+ * (`expiresAt`) when it asks for a ticket; the cookie the exchange sets expires
+ * with the platform session and carries `omniaSid`, which the auth middleware
+ * re-checks against the platform on every request. There is no other login.
  */
 @Controller('/auth/omnia')
 export class OmniaSsoController {
   constructor(
     private _users: UsersService,
     private _organizations: OrganizationService,
-    private _prisma: PrismaRepository<'user'>
+    private _prisma: PrismaRepository<'user'>,
+    private _omnia: OmniaPlatformService
   ) {}
 
   private secretMatches(given?: string) {
@@ -54,7 +62,14 @@ export class OmniaSsoController {
   @Post('/session')
   async session(
     @Headers('x-omnia-sso-secret') secret: string,
-    @Body() body: { tenantId?: string; tenantName?: string; email?: string },
+    @Body()
+    body: {
+      tenantId?: string;
+      tenantName?: string;
+      email?: string;
+      sid?: string;
+      expiresAt?: string;
+    },
     @RealIP() ip: string,
     @UserAgent() userAgent: string
   ) {
@@ -68,6 +83,13 @@ export class OmniaSsoController {
     const tenantId = (body?.tenantId || '').trim();
     if (!tenantId || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       throw new HttpException('tenantId and a valid email are required', HttpStatus.BAD_REQUEST);
+    }
+    // The platform session this studio session will project. Both are required:
+    // a ticket without a platform session to bind to is not minted.
+    const sid = (body?.sid || '').trim();
+    const platformExp = Date.parse(body?.expiresAt || '');
+    if (!sid || Number.isNaN(platformExp) || platformExp <= Date.now()) {
+      throw new HttpException('sid and a future expiresAt are required', HttpStatus.BAD_REQUEST);
     }
 
     // A bridge user belongs to exactly one platform tenant: providerId is the
@@ -112,6 +134,8 @@ export class OmniaSsoController {
     const ticket = AuthChecker.signJWT({
       omniaLogin: userId,
       tenantId,
+      sid,
+      platformExp: Math.floor(platformExp / 1000),
       jti: randomBytes(16).toString('hex'),
       exp: dayjs().add(TICKET_SECONDS, 'seconds').unix(),
     });
@@ -128,7 +152,14 @@ export class OmniaSsoController {
     if (!process.env.OMNIA_SSO_SECRET || !ticket) {
       return response.redirect(`${front}/auth/login`);
     }
-    type Ticket = { omniaLogin?: string; jti?: string; tenantId?: string; exp?: number };
+    type Ticket = {
+      omniaLogin?: string;
+      jti?: string;
+      tenantId?: string;
+      exp?: number;
+      sid?: string;
+      platformExp?: number;
+    };
     let payload: Ticket;
     try {
       payload = AuthChecker.verifyJWT(ticket) as Ticket;
@@ -139,7 +170,13 @@ export class OmniaSsoController {
     }
     // Single use: the first redemption claims the ticket id for as long as the
     // ticket could still verify; a replay within that window is refused.
-    if (!payload?.jti || typeof payload.exp !== 'number' || !payload.tenantId) {
+    if (
+      !payload?.jti ||
+      typeof payload.exp !== 'number' ||
+      !payload.tenantId ||
+      !payload.sid ||
+      typeof payload.platformExp !== 'number'
+    ) {
       return response.status(HttpStatus.UNAUTHORIZED).send('This Omnia login link is incomplete.');
     }
     const claimed = await ioRedis.set(`omnia-ticket:${payload.jti}`, '1', 'EX', TICKET_SECONDS + 5, 'NX');
@@ -153,16 +190,32 @@ export class OmniaSsoController {
       return response.status(HttpStatus.UNAUTHORIZED).send('This Omnia login link does not match a studio user.');
     }
 
-    // Mirror of AuthService.jwt(): the session token is the user without the hash.
+    // The platform must still vouch for the session it named — a ticket minted
+    // for a session that ended in the meantime is refused here, not later.
+    await this._omnia.forgetSession(payload.sid);
+    if (!(await this._omnia.isSessionActive(payload.sid))) {
+      return response
+        .status(HttpStatus.UNAUTHORIZED)
+        .send('Your Omnia session has ended. Sign in on the Omnia console again.');
+    }
+
+    // Mirror of AuthService.jwt(): the session token is the user without the
+    // hash — plus the platform session it projects and that session's expiry.
+    // The cookie dies with the platform session; the studio never renews it.
     const safeUser: Record<string, unknown> = { ...user };
     delete safeUser.password;
-    const jwt = AuthChecker.signJWT(safeUser);
+    const platformExpiresAt = new Date(payload.platformExp * 1000);
+    const jwt = AuthChecker.signJWT({
+      ...safeUser,
+      omniaSid: payload.sid,
+      exp: payload.platformExp,
+    });
     response.cookie('auth', jwt, {
       domain: getCookieUrlFromDomain(front),
       ...(!process.env.NOT_SECURED
         ? { secure: true, httpOnly: true, sameSite: 'none' as const }
         : {}),
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      expires: platformExpiresAt,
     });
     if (process.env.NOT_SECURED) {
       response.header('auth', jwt);

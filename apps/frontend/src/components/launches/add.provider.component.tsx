@@ -525,9 +525,21 @@ export const AddProviderComponent: FC<{
           // (X-Frame-Options: DENY), so the OAuth dialog opens in a popup; when it finishes
           // (the popup lands back on the studio and closes itself — see
           // omnia.popup.component.tsx) the frame reloads with the new channel.
+          //
+          // The target must be `_blank`, not a name: the dashboard recreates this iframe on
+          // every tab switch, and a popup left parked on the provider keeps its name — a named
+          // window.open from the recreated frame (no longer its opener) is refused by the
+          // browser ("Unsafe attempt to initiate navigation", OMN-113) and the click dies.
+          // The name is stamped on the fresh window afterwards so the popup can still
+          // recognize itself when the provider sends it back to the studio.
           if (window.self !== window.top) {
-            const popup = window.open(url, 'omnia-oauth', 'popup=yes,width=680,height=800');
+            const popup = window.open(url, '_blank', 'popup=yes,width=680,height=800');
             if (popup) {
+              try {
+                popup.name = 'omnia-oauth';
+              } catch {
+                // cross-origin already — the round-trip still works, only self-close is lost
+              }
               const tick = window.setInterval(() => {
                 if (popup.closed) {
                   window.clearInterval(tick);

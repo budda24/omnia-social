@@ -167,6 +167,16 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
       : post.message;
   }
 
+  // nostr-tools v2 requires the 32-byte secret key as Uint8Array; the JWT carries it as the hex
+  // string the user pasted. authenticate() already converts for getPublicKey — post() and
+  // comment() passed the raw string and threw "expected Uint8Array, got type=string" on every
+  // publish (upstream bug, hit the first time a Nostr post actually went out).
+  private secretKeyBytes(password: string): Uint8Array {
+    return Uint8Array.from(
+      (password.match(/.{1,2}/g) || []).map((byte: string) => parseInt(byte, 16))
+    );
+  }
+
   async post(
     id: string,
     accessToken: string,
@@ -182,7 +192,7 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
         tags: [],
         created_at: Math.floor(Date.now() / 1000),
       },
-      password
+      this.secretKeyBytes(password)
     );
 
     const eventId = await this.publish(id, textEvent);
@@ -219,7 +229,7 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
         ],
         created_at: Math.floor(Date.now() / 1000),
       },
-      password
+      this.secretKeyBytes(password)
     );
 
     const eventId = await this.publish(id, textEvent);

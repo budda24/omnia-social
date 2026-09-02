@@ -40,6 +40,11 @@ export class InstagramProvider
     'instagram_manage_comments',
     'instagram_manage_insights',
   ];
+
+  // Requested, never required — see the note on `FacebookProvider.optionalScopes` (OMN-107).
+  // `instagram_manage_comments` above already covers reading and answering comments; this is the
+  // direct-message half, which upstream never asks for.
+  optionalScopes = ['instagram_manage_messages'];
   override maxConcurrentJob = 400;
   editor = 'normal' as const;
   dto = InstagramDto;
@@ -423,7 +428,9 @@ export class InstagramProvider
           `${process.env.FRONTEND_URL}/integrations/social/instagram`
         )}` +
         `&state=${state}` +
-        `&scope=${encodeURIComponent(this.scopes.join(','))}`,
+        `&scope=${encodeURIComponent(
+          [...this.scopes, ...this.optionalScopes].join(',')
+        )}`,
       codeVerifier: makeId(10),
       state,
     };

@@ -38,6 +38,20 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     'pages_read_engagement',
     'read_insights',
   ];
+
+  // Requested at the consent dialog, but NOT required to connect (OMN-107).
+  //
+  // The platform's chat answers "which messages has nobody replied to?" straight from the Graph
+  // API, using the page token this fork mirrors into the platform vault. That needs
+  // `pages_messaging`, which upstream never asks for, so the mirrored token could not read a
+  // single conversation.
+  //
+  // It is kept OUT of `scopes` on purpose: `checkScopes` throws `NotEnoughScopes` when any
+  // REQUIRED scope is missing, so listing it there would mean an app or a user that declines
+  // messaging cannot connect the page at all — publishing and insights included. Asking for it
+  // separately degrades instead: granted, the inbox works; declined, the channel still connects
+  // and the platform reports the inbox as unavailable rather than showing an empty one.
+  optionalScopes = ['pages_messaging'];
   override maxConcurrentJob = 500; // Facebook has reasonable rate limits
   editor = 'normal' as const;
   maxLength() {
@@ -245,7 +259,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
           `${process.env.FRONTEND_URL}/integrations/social/facebook`
         )}` +
         `&state=${state}` +
-        `&scope=${this.scopes.join(',')}`,
+        `&scope=${[...this.scopes, ...this.optionalScopes].join(',')}`,
       codeVerifier: makeId(10),
       state,
     };

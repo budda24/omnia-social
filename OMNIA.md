@@ -80,3 +80,9 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   platform session — legacy password accounts (and their year-long cookies) are refused; the cron refresh failure,
   `disconnectChannel` and the one-time-token sibling rotation (`rootInternalId`) mirror too; a login call without a
   ticket lands on `/auth/login-required`.
+- `v2.23.0-omnia.15` — the Meta providers **request** the messaging permissions they never asked for, so the token this
+  fork mirrors into the platform vault can read a page's inbox: `pages_messaging` (Facebook) and
+  `instagram_manage_messages` (Instagram). Both live in a new `optionalScopes` field, not in `scopes`, and only
+  `scopes` is passed to `checkScopes` — a scope that is declined must not stop the channel connecting, because the
+  same token also carries publishing and insights. Granted, the platform's chat can answer "what has nobody replied
+  to?"; declined, it says the inbox is unavailable for that channel instead of showing an empty one.

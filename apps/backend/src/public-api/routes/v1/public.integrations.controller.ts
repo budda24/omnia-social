@@ -63,6 +63,12 @@ import { PostValidationException } from '@gitroom/backend/api/routes/posts.valid
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
+/**
+ * Far past any real library (10000 pages x 18 = 180000 pictures), and low enough that the page
+ * number can never reach Prisma as a value too large for a 64-bit `skip`.
+ */
+const MAX_MEDIA_PAGE = 10000;
+
 @ApiTags('Public API')
 @Controller('/public/v1')
 export class PublicIntegrationsController {
@@ -90,10 +96,17 @@ export class PublicIntegrationsController {
     }
 
     const getFile = await this.storage.uploadFile(file);
+    // The fourth argument is `originalName`, and upstream omits it — so every picture uploaded
+    // through the public API is stored with `originalName: null`, and `getMedia`'s search filters on
+    // `originalName` **only**. The result, found by this card's verification round: the platform
+    // uploads a picture called `beach.png`, the library lists it under its hashed storage name, the
+    // person says "the beach one", and the search returns nothing. Passing the name the caller sent
+    // is the whole fix and it costs an argument.
     return this._mediaService.saveFile(
       org.id,
       getFile.originalname,
-      getFile.path
+      getFile.path,
+      file.originalname
     );
   }
 
@@ -189,9 +202,54 @@ export class PublicIntegrationsController {
     // A page number that is absent, zero, negative or not a number is page 1. `getMedia` does
     // `(page || 1) - 1` and would turn a negative into a negative `skip`, which Prisma rejects at
     // runtime — a 500 for a typo in a query string.
+    //
+    // The upper bound matters just as much and the first cut missed it: `?page=99999999999999999999`
+    // is finite and >= 1, so it passed the guard and reached Prisma as `skip: 1.8e+21`, which threw
+    // `Unable to fit value into a 64-bit signed integer` — a 500 on a public endpoint reachable by
+    // any org's key. Found by this card's verification round. 10000 pages is 180000 pictures, far
+    // past any real library, and anything beyond it is a typo or a probe either way.
     const parsed = Number(page);
-    const pageNumber = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1;
+    const pageNumber =
+      Number.isFinite(parsed) && parsed >= 1 ? Math.min(Math.floor(parsed), MAX_MEDIA_PAGE) : 1;
     return this._mediaService.getMedia(org.id, pageNumber, search);
+  }
+
+  /**
+   * One picture from this organization's library, by id (OMN-149).
+   *
+   * The platform needs this to put a *library* picture on a post: a post's `MediaDto` requires both
+   * `id` and `path`, and a caller holding only an id has no way to obtain the path. Listing and
+   * paging until the id turns up would be O(library) per post and would race with an upload.
+   *
+   * ## The organization check is HERE, deliberately, and it is load-bearing
+   *
+   * `MediaRepository.getMediaById` is a bare `findUnique({ where: { id } })` with **no
+   * organization filter** — unlike `getMedia`, which scopes and soft-delete-filters properly.
+   * Exposing it as-is would have been a cross-organization read: any org's API key could fetch any
+   * other org's media row, including its `path`. So the row is fetched and then verified against
+   * the calling organization, and a mismatch answers **404 rather than 403** — a 403 would confirm
+   * that the id exists somewhere, which is an existence oracle across a tenant boundary.
+   *
+   * `deletedAt` is checked for the same reason `getMedia` filters it: a soft-deleted picture is
+   * gone as far as anyone outside the studio is concerned.
+   */
+  @Get('/media/:id')
+  async getMediaById(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    const media = await this._mediaService.getMediaById(id);
+    if (!media || media.organizationId !== org.id || media.deletedAt) {
+      throw new HttpException({ msg: 'Media not found' }, 404);
+    }
+    return {
+      id: media.id,
+      path: media.path,
+      name: media.name,
+      originalName: media.originalName,
+      thumbnail: media.thumbnail,
+    };
   }
 
   @Get('/find-slot/:id')

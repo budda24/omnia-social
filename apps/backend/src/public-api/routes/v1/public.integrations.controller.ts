@@ -161,6 +161,39 @@ export class PublicIntegrationsController {
     );
   }
 
+  /**
+   * List this organization's media library (OMN-149, Omnia fork).
+   *
+   * Upstream's public API can `POST /upload` and can attach media to a post, and has no way to ask
+   * what media already exists — so a client can add pictures and never see them again. The Omnia
+   * chat needs exactly that question answered ("what pictures do I have?"), and answering it from
+   * the platform side is impossible: the media rows live in the studio's own database.
+   *
+   * Deliberately a thin pass-through over `MediaService.getMedia`, which already exists and is
+   * already organization-scoped, `deletedAt`-filtered and newest-first. Nothing is reshaped here —
+   * the `{pages, results}` envelope is upstream's own, and `results[]` carries the `id` and `path`
+   * that `MediaDto` requires when a post references a picture. Keeping the shape identical is what
+   * makes this endpoint cheap to delete: if upstream ever ships its own media listing, the fork
+   * drops this method and the platform's client keeps working unchanged.
+   *
+   * Page size is upstream's 18 per page, from `MediaRepository.getMedia`, and is not a parameter
+   * here because it is not one there.
+   */
+  @Get('/media')
+  async listMedia(
+    @GetOrgFromRequest() org: Organization,
+    @Query('page') page?: string,
+    @Query('search') search?: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    // A page number that is absent, zero, negative or not a number is page 1. `getMedia` does
+    // `(page || 1) - 1` and would turn a negative into a negative `skip`, which Prisma rejects at
+    // runtime — a 500 for a typo in a query string.
+    const parsed = Number(page);
+    const pageNumber = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 1;
+    return this._mediaService.getMedia(org.id, pageNumber, search);
+  }
+
   @Get('/find-slot/:id')
   async findSlotIntegration(
     @GetOrgFromRequest() org: Organization,

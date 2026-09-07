@@ -96,37 +96,37 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
     return {};
   }
 
+  // The id of a Nostr event is the hash `finalizeEvent` already computed — it is on the event
+  // before any relay sees it. Upstream instead subscribed to `{kinds:[1], authors:[pubkey]}` after
+  // publishing and took the FIRST event the relay streamed back, which is whichever earlier note
+  // the relay chose to send first: every post published by this account got the release id of an
+  // old note (OMN-212 — two notes published minutes apart both linked to a 2026-09-02 event).
+  // Now: publish to every relay, remember which accepted it, and return the event's own id. No
+  // relay accepting it is a failure the post must show, not a success with an empty link.
   private async publish(pubkey: string, event: any) {
-    let id = '';
+    const accepted: string[] = [];
+    const refused: string[] = [];
     for (const relay of list) {
       try {
         const relayInstance = await Relay.connect(relay);
-        const value = new Promise<any>((resolve) => {
-          relayInstance.subscribe([{ kinds: [1], authors: [pubkey] }], {
-            eoseTimeout: 6000,
-            onevent: (event) => {
-              resolve(event);
-            },
-            oneose: () => {
-              resolve({});
-            },
-            onclose: () => {
-              resolve({});
-            },
-          });
-        });
-
-        await relayInstance.publish(event);
-        const all = await value;
-        relayInstance.close();
-        // relayInstance.close();
-        id = id || all?.id;
+        try {
+          await relayInstance.publish(event);
+          accepted.push(relay);
+        } finally {
+          relayInstance.close();
+        }
       } catch (err) {
-        /**empty**/
+        refused.push(`${relay}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    return id;
+    if (!accepted.length) {
+      throw new Error(
+        `No Nostr relay accepted the event — ${refused.join('; ') || 'no relay reachable'}`
+      );
+    }
+
+    return String(event.id);
   }
 
   async authenticate(params: {

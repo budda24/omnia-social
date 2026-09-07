@@ -42,7 +42,11 @@ export class CopilotController {
       process.env.OPENAI_API_KEY === undefined ||
       process.env.OPENAI_API_KEY === ''
     ) {
-      Logger.warn('OpenAI API key not set, chat functionality will not work');
+      // Answer, do not hang: with no key the request used to return nothing, so the reverse proxy
+      // reported a 504 a minute later on every studio load (OMN-216). The studio's own copilot is
+      // not part of the Omnia platform — the platform's chat is — so 204 is the honest answer.
+      Logger.warn('OpenAI API key not set, the studio copilot is off');
+      res.status(204).end();
       return;
     }
 
@@ -68,7 +72,11 @@ export class CopilotController {
       process.env.OPENAI_API_KEY === undefined ||
       process.env.OPENAI_API_KEY === ''
     ) {
-      Logger.warn('OpenAI API key not set, chat functionality will not work');
+      // Answer, do not hang: with no key the request used to return nothing, so the reverse proxy
+      // reported a 504 a minute later on every studio load (OMN-216). The studio's own copilot is
+      // not part of the Omnia platform — the platform's chat is — so 204 is the honest answer.
+      Logger.warn('OpenAI API key not set, the studio copilot is off');
+      res.status(204).end();
       return;
     }
     const mastra = await this._mastraService.mastra();

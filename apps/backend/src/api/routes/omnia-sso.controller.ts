@@ -146,6 +146,79 @@ export class OmniaSsoController {
     };
   }
 
+  /**
+   * The public API key of the studio organisation bound to a platform tenant's user, for the
+   * platform to store in its vault on first use (OMN-215). Server to server, same secret as
+   * `/session`; same binding rule (a bridge user belongs to exactly one tenant, an e-mail with a
+   * studio account outside the tenant is never taken over); creates the user and organisation
+   * when the person has not opened the studio yet, exactly as `/session` would, so the key handed
+   * back is the key of the organisation their studio session will land in.
+   */
+  @Post('/api-key')
+  async apiKey(
+    @Headers('x-omnia-sso-secret') secret: string,
+    @Body() body: { tenantId?: string; tenantName?: string; email?: string },
+    @RealIP() ip: string,
+    @UserAgent() userAgent: string
+  ) {
+    if (!process.env.OMNIA_SSO_SECRET) {
+      throw new HttpException('Omnia SSO is not configured', HttpStatus.NOT_FOUND);
+    }
+    if (!this.secretMatches(secret)) {
+      throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
+    }
+    const email = (body?.email || '').trim().toLowerCase();
+    const tenantId = (body?.tenantId || '').trim();
+    if (!tenantId || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      throw new HttpException('tenantId and a valid email are required', HttpStatus.BAD_REQUEST);
+    }
+    const boundTo = `omnia:${tenantId}`;
+    const existing = await this._prisma.model.user.findFirst({
+      where: { email, providerName: Provider.LOCAL },
+      select: { id: true, providerId: true },
+    });
+    if (existing && existing.providerId !== boundTo) {
+      throw new HttpException(
+        'This e-mail belongs to a studio account outside this Omnia tenant.',
+        HttpStatus.CONFLICT
+      );
+    }
+    let userId: string | undefined = existing?.id;
+    let created = false;
+    if (!userId) {
+      const company = (body?.tenantName || `Omnia ${tenantId.slice(0, 8)}`)
+        .trim()
+        .slice(0, 128)
+        .padEnd(3, '·');
+      const org = await this._organizations.createOrgAndUser(
+        {
+          company,
+          email,
+          password: '',
+          provider: Provider.LOCAL,
+          providerId: boundTo,
+          datafast_visitor_id: '',
+        } as Omit<CreateOrgUserDto, 'providerToken'>,
+        ip,
+        userAgent
+      );
+      userId = org.users[0].user.id;
+      created = true;
+    }
+    const orgs = (await this._organizations.getOrgsByUserId(userId)).filter(
+      (o) => !o.users[0]?.disabled
+    );
+    const org = orgs[0];
+    if (!org) {
+      throw new HttpException('No studio organisation for this tenant', HttpStatus.NOT_FOUND);
+    }
+    let apiKey = org.apiKey;
+    if (!apiKey) {
+      apiKey = (await this._organizations.updateApiKey(org.id)).apiKey;
+    }
+    return { apiKey, organizationId: org.id, created };
+  }
+
   @Get('/login')
   async login(@Query('ticket') ticket: string, @Res() response: Response) {
     const front = process.env.FRONTEND_URL!;

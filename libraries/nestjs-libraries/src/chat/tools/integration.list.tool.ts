@@ -58,7 +58,7 @@ export class IntegrationListTool implements AgentToolInterface {
               name: p.name,
               id: p.id,
               disabled: p.disabled,
-              picture: p.picture || '/no-picture.jpg',
+              picture: p.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg',
               platform: p.providerIdentifier,
               display: p.profile,
               type: p.type,

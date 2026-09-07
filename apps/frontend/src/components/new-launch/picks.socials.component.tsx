@@ -66,7 +66,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
                     )}
                   >
                     <ImageWithFallback
-                      fallbackSrc="/no-picture.jpg"
+                      fallbackSrc={(process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                       src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
                       className={clsx(
                         'rounded-full transition-all min-w-[42px] border-[1.5px] min-h-[42px]',

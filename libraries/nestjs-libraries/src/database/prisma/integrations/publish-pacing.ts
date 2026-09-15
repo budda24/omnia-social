@@ -20,6 +20,12 @@ export type PublishPacingInput = {
     limit: number;
     nextAllowedAt: Date;
   };
+  globalQuota?: {
+    providerFamily: string;
+    used: number;
+    limit: number;
+    nextAllowedAt: Date;
+  };
 };
 
 export type PublishPacingDecision =
@@ -42,6 +48,7 @@ export function resolvePacing({
   pacing = {},
   publishedAt = [],
   tenantQuota,
+  globalQuota,
 }: PublishPacingInput): PublishPacingDecision {
   const nowMs = now.getTime();
   const minIntervalMinutes = positive(pacing.minIntervalMinutes) || 0;
@@ -68,6 +75,19 @@ export function resolvePacing({
       type: 'defer',
       deferUntil: tenantQuota.nextAllowedAt,
       reason: `Tenant daily publish quota reached (${tenantQuota.used}/${tenantQuota.limit})`,
+      jitterWindowMs,
+    };
+  }
+
+  if (
+    globalQuota &&
+    globalQuota.limit > 0 &&
+    globalQuota.used >= globalQuota.limit
+  ) {
+    return {
+      type: 'defer',
+      deferUntil: globalQuota.nextAllowedAt,
+      reason: `${globalQuota.providerFamily} app daily publish cap reached (${globalQuota.used}/${globalQuota.limit})`,
       jitterWindowMs,
     };
   }

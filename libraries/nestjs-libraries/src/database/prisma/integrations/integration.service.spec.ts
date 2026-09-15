@@ -1,5 +1,10 @@
 import { IntegrationRepository } from './integration.repository';
 import { resolvePacing, temporalDate } from './publish-pacing';
+import { IntegrationService } from './integration.service';
+
+jest.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
+  IntegrationManager: class IntegrationManager {},
+}));
 
 describe('Social publish pacing (OMN-273)', () => {
   const now = new Date('2026-09-15T10:00:00.000Z');
@@ -137,5 +142,120 @@ describe('Social publish pacing (OMN-273)', () => {
     expect(() => temporalDate('not-a-date', 'publish attempt date')).toThrow(
       'Invalid publish attempt date'
     );
+  });
+
+  test('a configured global provider-family cap defers to next UTC midnight', () => {
+    expect(
+      resolvePacing({
+        now,
+        globalQuota: {
+          providerFamily: 'Meta',
+          used: 500,
+          limit: 500,
+          nextAllowedAt: new Date('2026-09-16T00:00:00.000Z'),
+        },
+      })
+    ).toEqual({
+      type: 'defer',
+      deferUntil: new Date('2026-09-16T00:00:00.000Z'),
+      reason: 'Meta app daily publish cap reached (500/500)',
+      jitterWindowMs: 0,
+    });
+  });
+
+  test('counts all organizations of an Omnia tenant before claiming', async () => {
+    const countPublishedPosts = jest.fn().mockResolvedValue(2);
+    const claimPublishSlot = jest.fn();
+    const service = Object.create(IntegrationService.prototype) as any;
+    service._integrationRepository = {
+      getPublishPacingSnapshot: jest.fn().mockResolvedValue({
+        integration: {
+          providerIdentifier: 'mastodon',
+          refreshNeeded: false,
+          disabled: false,
+          publishLeaseHolder: null,
+          publishFrozenUntil: null,
+          publishFreezeReason: null,
+          nextPublishAllowedAt: null,
+          publishMinIntervalMinutes: null,
+          publishDailyLimit: null,
+          publishWeeklyLimit: null,
+        },
+        publishedAt: [],
+      }),
+      countPublishedPosts,
+      claimPublishSlot,
+    };
+    service._integrationManager = {
+      getSocialIntegration: jest.fn().mockReturnValue({ publishPacing: {} }),
+    };
+    service._omnia = {
+      tenantOf: jest.fn().mockResolvedValue('tenant-1'),
+      organizationsOfTenant: jest.fn().mockResolvedValue(['org-1', 'org-2']),
+    };
+    const oldLimit = process.env.OMNIA_TENANT_DAILY_PUBLISHES;
+    process.env.OMNIA_TENANT_DAILY_PUBLISHES = '2';
+    try {
+      await expect(
+        service.claimPublishSlot('org-1', 'channel-1', 'post-3', now)
+      ).resolves.toMatchObject({
+        claimed: false,
+        type: 'defer',
+        deferUntil: new Date('2026-09-16T00:00:00.000Z'),
+        reason: expect.stringContaining('Tenant daily publish quota'),
+      });
+    } finally {
+      if (oldLimit === undefined) {
+        delete process.env.OMNIA_TENANT_DAILY_PUBLISHES;
+      } else {
+        process.env.OMNIA_TENANT_DAILY_PUBLISHES = oldLimit;
+      }
+    }
+    expect(countPublishedPosts).toHaveBeenCalledWith(
+      new Date('2026-09-15T00:00:00.000Z'),
+      now,
+      { organizationIds: ['org-1', 'org-2'] }
+    );
+    expect(claimPublishSlot).not.toHaveBeenCalled();
+  });
+
+  test('a non-Omnia organization skips the tenant quota', async () => {
+    const countPublishedPosts = jest.fn();
+    const claimPublishSlot = jest.fn().mockResolvedValue(true);
+    const service = Object.create(IntegrationService.prototype) as any;
+    service._integrationRepository = {
+      getPublishPacingSnapshot: jest.fn().mockResolvedValue({
+        integration: {
+          providerIdentifier: 'mastodon',
+          refreshNeeded: false,
+          disabled: false,
+          publishLeaseHolder: null,
+          publishFrozenUntil: null,
+          publishFreezeReason: null,
+          nextPublishAllowedAt: null,
+          publishMinIntervalMinutes: null,
+          publishDailyLimit: null,
+          publishWeeklyLimit: null,
+        },
+        publishedAt: [],
+      }),
+      countPublishedPosts,
+      claimPublishSlot,
+    };
+    service._integrationManager = {
+      getSocialIntegration: jest.fn().mockReturnValue({ publishPacing: {} }),
+    };
+    service._omnia = {
+      tenantOf: jest.fn().mockResolvedValue(null),
+      organizationsOfTenant: jest.fn(),
+    };
+
+    await expect(
+      service.claimPublishSlot('external-org', 'channel-1', 'post-1', now)
+    ).resolves.toEqual({
+      claimed: true,
+      nextPublishAllowedAt: now,
+    });
+    expect(countPublishedPosts).not.toHaveBeenCalled();
   });
 });

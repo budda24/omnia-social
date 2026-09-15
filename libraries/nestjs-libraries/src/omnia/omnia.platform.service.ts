@@ -22,10 +22,14 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 @Injectable()
 export class OmniaPlatformService {
   private readonly log = new Logger('OmniaPlatform');
-  constructor(private _prisma: PrismaRepository<'userOrganization' | 'integration'>) {}
+  constructor(
+    private _prisma: PrismaRepository<'userOrganization' | 'integration'>
+  ) {}
 
   static get configured() {
-    return !!(process.env.OMNIA_PLATFORM_INTERNAL_URL && process.env.OMNIA_SSO_SECRET);
+    return !!(
+      process.env.OMNIA_PLATFORM_INTERNAL_URL && process.env.OMNIA_SSO_SECRET
+    );
   }
 
   private get base() {
@@ -46,7 +50,41 @@ export class OmniaPlatformService {
       select: { user: { select: { providerId: true } } },
     });
     const providerId = link?.user?.providerId || '';
-    return providerId.startsWith('omnia:') ? providerId.slice('omnia:'.length) : null;
+    return providerId.startsWith('omnia:')
+      ? providerId.slice('omnia:'.length)
+      : null;
+  }
+
+  /** Every studio organization projected from one platform tenant. */
+  async organizationsOfTenant(tenantId: string): Promise<string[]> {
+    if (!tenantId) return [];
+    const key = `omnia-tenant-organizations:${tenantId}`;
+    const cached = await ioRedis.get(key).catch(() => null);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (
+          Array.isArray(parsed) &&
+          parsed.every((id) => typeof id === 'string')
+        ) {
+          return parsed;
+        }
+      } catch {
+        // A corrupt cache entry is replaced from the database below.
+      }
+    }
+
+    const links = await this._prisma.model.userOrganization.findMany({
+      where: { user: { providerId: `omnia:${tenantId}` } },
+      select: { organizationId: true },
+    });
+    const organizationIds = [
+      ...new Set(links.map(({ organizationId }) => organizationId)),
+    ];
+    await ioRedis
+      .set(key, JSON.stringify(organizationIds), 'EX', 60)
+      .catch(() => undefined);
+    return organizationIds;
   }
 
   /**
@@ -67,7 +105,9 @@ export class OmniaPlatformService {
     let active = false;
     try {
       const res = await fetch(
-        `${this.base}/api/social/studio-session/check?sid=${encodeURIComponent(sid)}`,
+        `${this.base}/api/social/studio-session/check?sid=${encodeURIComponent(
+          sid
+        )}`,
         { headers: this.headers(), signal: AbortSignal.timeout(5000) }
       );
       if (res.ok) {
@@ -77,7 +117,9 @@ export class OmniaPlatformService {
     } catch (err) {
       // Unreachable platform: refuse this request (fail closed) but do not
       // remember the refusal — the next request asks again.
-      this.log.warn(`platform session check failed for ${sid}: ${(err as Error).message}`);
+      this.log.warn(
+        `platform session check failed for ${sid}: ${(err as Error).message}`
+      );
       return false;
     }
     if (!active) await ioRedis.set(key, '0', 'EX', 60);
@@ -119,25 +161,27 @@ export class OmniaPlatformService {
     // until the page is chosen: the user-level token of step one is never mirrored.
     if (integration.inBetweenSteps) return;
     void (async () => {
-      const tenantId = await this.tenantOf(integration.organizationId).catch(() => null);
+      const tenantId = await this.tenantOf(integration.organizationId).catch(
+        () => null
+      );
       if (!tenantId) return; // not an Omnia-bridged workspace: nothing to mirror
       const body = JSON.stringify({
-            tenantId,
-            studioOrganizationId: integration.organizationId,
-            studioIntegrationId: integration.id,
-            provider: integration.providerIdentifier,
-            internalId: integration.internalId,
-            name: integration.name,
-            picture: integration.picture || null,
-            profile: integration.profile || null,
-            token: integration.token,
-            refreshToken: integration.refreshToken || null,
-            tokenExpiresAt: integration.tokenExpiration
-              ? new Date(integration.tokenExpiration).toISOString()
-              : null,
-            disabled: !!integration.disabled,
-            refreshNeeded: !!integration.refreshNeeded,
-            deleted: !!integration.deletedAt,
+        tenantId,
+        studioOrganizationId: integration.organizationId,
+        studioIntegrationId: integration.id,
+        provider: integration.providerIdentifier,
+        internalId: integration.internalId,
+        name: integration.name,
+        picture: integration.picture || null,
+        profile: integration.profile || null,
+        token: integration.token,
+        refreshToken: integration.refreshToken || null,
+        tokenExpiresAt: integration.tokenExpiration
+          ? new Date(integration.tokenExpiration).toISOString()
+          : null,
+        disabled: !!integration.disabled,
+        refreshNeeded: !!integration.refreshNeeded,
+        deleted: !!integration.deletedAt,
       });
       const label = `${integration.providerIdentifier}/${integration.internalId}`;
       for (const wait of [0, 2000, 20000]) {
@@ -155,12 +199,20 @@ export class OmniaPlatformService {
             this.log.warn(`platform refused channel ${label}: ${res.status}`);
             return;
           }
-          this.log.warn(`platform answered ${res.status} for channel ${label}; retrying`);
+          this.log.warn(
+            `platform answered ${res.status} for channel ${label}; retrying`
+          );
         } catch (err) {
-          this.log.warn(`channel mirror failed for ${label}: ${(err as Error).message}; retrying`);
+          this.log.warn(
+            `channel mirror failed for ${label}: ${
+              (err as Error).message
+            }; retrying`
+          );
         }
       }
-      this.log.error(`channel ${label} is NOT mirrored to the platform vault after 3 attempts`);
+      this.log.error(
+        `channel ${label} is NOT mirrored to the platform vault after 3 attempts`
+      );
     })();
   }
 
@@ -176,7 +228,9 @@ export class OmniaPlatformService {
   /** Every channel of an organization — for bulk state changes. */
   async mirrorOrganization(organizationId: string) {
     if (!OmniaPlatformService.configured) return;
-    const rows = await this._prisma.model.integration.findMany({ where: { organizationId } });
+    const rows = await this._prisma.model.integration.findMany({
+      where: { organizationId },
+    });
     for (const row of rows) this.mirrorChannel(row);
   }
 

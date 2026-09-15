@@ -40,6 +40,13 @@ dayjs.extend(utc);
 const positive = (value: number | undefined) =>
   Number.isFinite(value) && Number(value) > 0 ? Number(value) : undefined;
 
+const META_PROVIDER_IDENTIFIERS = [
+  'facebook',
+  'instagram',
+  'instagram-standalone',
+  'threads',
+];
+
 function configuredPacing(
   provider: SocialProvider,
   integration: Integration
@@ -256,6 +263,49 @@ export class IntegrationService {
       const provider = this._integrationManager.getSocialIntegration(
         snapshot.integration.providerIdentifier
       );
+      const dayStart = new Date(
+        Date.UTC(
+          attemptAt.getUTCFullYear(),
+          attemptAt.getUTCMonth(),
+          attemptAt.getUTCDate()
+        )
+      );
+      const nextDay = new Date(dayStart.getTime() + 24 * 60 * 60_000);
+      const tenantId = await this._omnia.tenantOf(org);
+      const tenantLimit = envPositive('OMNIA_TENANT_DAILY_PUBLISHES') || 100;
+      const tenantQuota = tenantId
+        ? {
+            used: await this._integrationRepository.countPublishedPosts(
+              dayStart,
+              attemptAt,
+              {
+                organizationIds: await this._omnia.organizationsOfTenant(
+                  tenantId
+                ),
+              }
+            ),
+            limit: tenantLimit,
+            nextAllowedAt: nextDay,
+          }
+        : undefined;
+      const isMeta = META_PROVIDER_IDENTIFIERS.includes(
+        snapshot.integration.providerIdentifier
+      );
+      const globalMetaLimit = isMeta
+        ? envPositive('OMNIA_GLOBAL_DAILY_PUBLISHES_META')
+        : undefined;
+      const globalQuota = globalMetaLimit
+        ? {
+            providerFamily: 'Meta',
+            used: await this._integrationRepository.countPublishedPosts(
+              dayStart,
+              attemptAt,
+              { providerIdentifiers: META_PROVIDER_IDENTIFIERS }
+            ),
+            limit: globalMetaLimit,
+            nextAllowedAt: nextDay,
+          }
+        : undefined;
       const decision = resolvePacing({
         now: attemptAt,
         publishFrozenUntil: snapshot.integration.publishFrozenUntil,
@@ -263,6 +313,8 @@ export class IntegrationService {
         nextPublishAllowedAt: snapshot.integration.nextPublishAllowedAt,
         pacing: configuredPacing(provider, snapshot.integration),
         publishedAt: snapshot.publishedAt,
+        tenantQuota,
+        globalQuota,
       });
 
       return { snapshot, decision } as const;

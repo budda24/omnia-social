@@ -424,6 +424,37 @@ export class IntegrationRepository {
     };
   }
 
+  countPublishedPosts(
+    from: Date,
+    to: Date,
+    filters: {
+      organizationIds?: string[];
+      providerIdentifiers?: string[];
+    }
+  ) {
+    if (filters.organizationIds && filters.organizationIds.length === 0) {
+      return Promise.resolve(0);
+    }
+    return this._posts.model.post.count({
+      where: {
+        state: 'PUBLISHED',
+        deletedAt: null,
+        parentPostId: null,
+        publishDate: { gte: from, lte: to },
+        ...(filters.organizationIds
+          ? { organizationId: { in: filters.organizationIds } }
+          : {}),
+        ...(filters.providerIdentifiers
+          ? {
+              integration: {
+                providerIdentifier: { in: filters.providerIdentifiers },
+              },
+            }
+          : {}),
+      },
+    });
+  }
+
   async claimPublishSlot(
     org: string,
     id: string,

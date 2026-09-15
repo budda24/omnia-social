@@ -22,7 +22,14 @@ import { extend } from 'dayjs';
 import useCookie from 'react-use-cookie';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { timer } from '@gitroom/helpers/utils/timer';
-import { expandPostsList, expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
+import {
+  expandPostsList,
+  expandPosts,
+} from '@gitroom/helpers/utils/posts.list.minify';
+import {
+  CalendarDisplay,
+  getResponsiveCalendarDisplay,
+} from '@gitroom/frontend/components/launches/calendar.responsive';
 extend(isoWeek);
 extend(weekOfYear);
 
@@ -58,7 +65,7 @@ export const CalendarContext = createContext({
   setFilters: (filters: {
     startDate: string;
     endDate: string;
-    display: 'week' | 'month' | 'day' | 'list';
+    display: CalendarDisplay;
     customer: string | null;
   }) => {
     /** empty **/
@@ -215,16 +222,12 @@ export const CalendarWeekProvider: FC<{
     data: calendarData,
     isLoading: calendarIsLoading,
     mutate: mutateCalendar,
-  } = useSWR(
-    filters.display !== 'list' ? `/posts-${params}` : null,
-    loadData,
-    {
-      refreshInterval: 3600000,
-      refreshWhenOffline: false,
-      refreshWhenHidden: false,
-      revalidateOnFocus: false,
-    }
-  );
+  } = useSWR(filters.display !== 'list' ? `/posts-${params}` : null, loadData, {
+    refreshInterval: 3600000,
+    refreshWhenOffline: false,
+    refreshWhenHidden: false,
+    revalidateOnFocus: false,
+  });
 
   // SWR for list view
   const {
@@ -271,7 +274,7 @@ export const CalendarWeekProvider: FC<{
     (newFilters: {
       startDate: string;
       endDate: string;
-      display: 'week' | 'month' | 'day' | 'list';
+      display: CalendarDisplay;
       customer: string | null;
     }) => {
       setDisplaySaved(newFilters.display);
@@ -294,8 +297,35 @@ export const CalendarWeekProvider: FC<{
     []
   );
 
+  useEffect(() => {
+    const useReadableView = () => {
+      const nextDisplay = getResponsiveCalendarDisplay(
+        window.innerWidth,
+        filters.display as CalendarDisplay
+      );
+
+      if (nextDisplay === filters.display) {
+        return;
+      }
+
+      const range = getDateRange(nextDisplay, filters.startDate);
+      setFiltersWrapper({
+        ...range,
+        display: nextDisplay,
+        customer: filters.customer,
+      });
+    };
+
+    useReadableView();
+    window.addEventListener('resize', useReadableView);
+    return () => window.removeEventListener('resize', useReadableView);
+  }, [filters.customer, filters.display, filters.startDate, setFiltersWrapper]);
+
   const posts = useMemo(() => calendarData?.posts || [], [calendarData?.posts]);
-  const comments = useMemo(() => calendarData?.comments || [], [calendarData?.comments]);
+  const comments = useMemo(
+    () => calendarData?.comments || [],
+    [calendarData?.comments]
+  );
 
   // List view data
   const listPosts = useMemo(() => listData?.posts || [], [listData?.posts]);
@@ -332,7 +362,8 @@ export const CalendarWeekProvider: FC<{
   }, [mutateCalendar, mutateList]);
 
   // Determine loading state based on current view
-  const loading = filters.display === 'list' ? listIsLoading : calendarIsLoading;
+  const loading =
+    filters.display === 'list' ? listIsLoading : calendarIsLoading;
 
   return (
     <CalendarContext.Provider

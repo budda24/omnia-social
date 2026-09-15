@@ -89,7 +89,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
             <ContinueProvider />
             <div
               className={clsx(
-                'flex flex-col min-h-screen min-w-screen text-newTextColor p-[12px]',
+                'flex flex-col min-h-screen min-w-screen text-newTextColor p-[6px] lg:p-[12px]',
                 jakartaSans.className
               )}
             >
@@ -99,9 +99,11 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
               ) : (
                 <>
                   <AnnouncementBanner />
-                  <div className="flex-1 flex gap-[8px]">
-                    <Support />
-                    <div className="flex flex-col bg-newBgColorInner w-[80px] rounded-[12px]">
+                  <div className="flex-1 flex gap-[8px] min-w-0">
+                    <div className="hidden lg:block">
+                      <Support />
+                    </div>
+                    <div className="hidden lg:flex flex-col bg-newBgColorInner w-[80px] rounded-[12px]">
                       <div
                         id="left-menu"
                         className={clsx(
@@ -115,12 +117,12 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         </div>
                       </div>
                     </div>
-                    <div className="flex-1 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
-                      <div className="flex bg-newBgColorInner h-[80px] px-[20px] items-center">
-                        <div className="text-[24px] font-[600] flex flex-1">
+                    <div className="flex-1 min-w-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
+                      <div className="flex flex-wrap bg-newBgColorInner min-h-[64px] lg:h-[80px] px-[12px] lg:px-[20px] py-[8px] lg:py-0 items-center gap-[8px]">
+                        <div className="text-[20px] lg:text-[24px] font-[600] flex flex-1 min-w-[120px]">
                           <Title />
                         </div>
-                        <div className="flex gap-[20px] text-textItemBlur">
+                        <div className="flex flex-wrap justify-end gap-[8px] lg:gap-[20px] text-textItemBlur max-w-full">
                           <StreakComponent />
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
                           <OrganizationSelector />
@@ -135,7 +137,9 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           <NotificationComponent />
                         </div>
                       </div>
-                      <div className="flex flex-1 gap-[1px]">{children}</div>
+                      <div className="flex flex-1 min-w-0 gap-[1px]">
+                        {children}
+                      </div>
                     </div>
                   </div>
                 </>

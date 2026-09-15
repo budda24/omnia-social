@@ -289,8 +289,13 @@ export const MenuComponent: FC<
           </div>
         )}
         <ImageWithFallback
-          fallbackSrc={(process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
-          src={integration.picture || (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'}
+          fallbackSrc={
+            (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'
+          }
+          src={
+            integration.picture ||
+            (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-picture.jpg'
+          }
           className="rounded-[8px] min-w-[36px] min-h-[36px]"
           alt={integration.identifier}
           width={36}
@@ -298,13 +303,19 @@ export const MenuComponent: FC<
         />
         {integration.identifier === 'youtube' ? (
           <img
-            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + "/icons/platforms/youtube.svg"}
+            src={
+              (process.env.NEXT_PUBLIC_BASE_PATH || '') +
+              '/icons/platforms/youtube.svg'
+            }
             className="absolute z-10 bottom-[5px] -end-[5px]"
             width={20}
           />
         ) : (
           <SafeImage
-            src={(process.env.NEXT_PUBLIC_BASE_PATH || '') + `/icons/platforms/${integration.identifier}.png`}
+            src={
+              (process.env.NEXT_PUBLIC_BASE_PATH || '') +
+              `/icons/platforms/${integration.identifier}.png`
+            }
             className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-fifth"
             alt={integration.identifier}
             width={18.41}
@@ -327,7 +338,7 @@ export const MenuComponent: FC<
           : {})}
         role="Handle"
         className={clsx(
-          'group-[.sidebar]:hidden flex-1 whitespace-nowrap text-ellipsis overflow-hidden cursor-move',
+          'group-[.sidebar]:hidden max-lg:!block flex-1 whitespace-nowrap text-ellipsis overflow-hidden cursor-move',
           integration.disabled && 'opacity-50'
         )}
       >
@@ -497,105 +508,111 @@ export const LaunchesComponent = () => {
     <DNDProvider>
       <Onboarding />
       <CalendarWeekProvider integrations={sortedIntegrations}>
-        <div
-          className={clsx(
-            'flex relative flex-col',
-            collapseMenu === '1' ? 'group sidebar w-[100px]' : 'w-[260px]'
-          )}
-        >
+        <div className="flex flex-1 min-w-0 flex-col lg:flex-row">
           <div
             className={clsx(
-              'bg-newBgColorInner p-[20px] flex flex-col gap-[15px] transition-all absolute start-0 top-0 w-full h-full overflow-x-hidden overflow-y-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor'
+              'flex relative flex-col h-[220px] shrink-0 lg:h-auto',
+              collapseMenu === '1'
+                ? 'group sidebar w-full lg:w-[100px]'
+                : 'w-full lg:w-[260px]'
             )}
           >
-            <div className="flex items-center">
-              <h2 className="group-[.sidebar]:hidden flex-1 text-[20px] font-[500]">
-                {t('channels')}
-              </h2>
-              <div
-                onClick={() =>
-                  setCollapseMenu(collapseMenu === '1' ? '0' : '1')
-                }
-                className="group-[.sidebar]:rotate-[180deg] group-[.sidebar]:mx-auto text-btnText bg-btnSimple rounded-[6px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer select-none"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="7"
-                  height="13"
-                  viewBox="0 0 7 13"
-                  fill="none"
+            <div
+              className={clsx(
+                'bg-newBgColorInner p-[12px] lg:p-[20px] flex flex-col gap-[12px] lg:gap-[15px] transition-all absolute start-0 top-0 w-full h-full overflow-x-hidden overflow-y-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor'
+              )}
+            >
+              <div className="flex items-center">
+                <h2 className="group-[.sidebar]:hidden max-lg:!block flex-1 text-[20px] font-[500]">
+                  {t('channels')}
+                </h2>
+                <div
+                  onClick={() =>
+                    setCollapseMenu(collapseMenu === '1' ? '0' : '1')
+                  }
+                  className="hidden lg:flex group-[.sidebar]:rotate-[180deg] group-[.sidebar]:mx-auto text-btnText bg-btnSimple rounded-[6px] w-[24px] h-[24px] items-center justify-center cursor-pointer select-none"
                 >
-                  <path
-                    d="M6 11.5L1 6.5L6 1.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-            </div>
-            <div className="flex flex-col gap-[8px] group-[.sidebar]:mx-auto group-[.sidebar]:w-[44px]">
-              <AddProviderButton update={() => update(true)} />
-              <div className="flex gap-[8px] group-[.sidebar]:flex-col">
-                {sortedIntegrations?.length > 0 && <NewPost />}
-                {sortedIntegrations?.length > 0 &&
-                  user?.tier?.ai &&
-                  billingEnabled && <GeneratorComponent />}
-              </div>
-            </div>
-            <div className="gap-[32px] flex flex-col select-none flex-1">
-              {sortedIntegrations.length === 0 && collapseMenu === '0' && (
-                <div className="flex-1 max-h-[500px] justify-center items-center flex">
-                  <div className="flex flex-col gap-[12px] text-center">
-                    <img
-                      src={
-                        mode === 'dark'
-                          ? (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-channels.svg'
-                          : (process.env.NEXT_PUBLIC_BASE_PATH || '') + '/no-channels-colors.svg'
-                      }
-                      alt="No channels"
-                      className="mx-auto min-w-[100%]"
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="7"
+                    height="13"
+                    viewBox="0 0 7 13"
+                    fill="none"
+                  >
+                    <path
+                      d="M6 11.5L1 6.5L6 1.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
-                    <div className="font-[600] text-[20px]">
-                      {t('no_channels', 'No channels yet')}
-                    </div>
-                    <div className="text-[14px]">
-                      {t('connect_your_accounts')}
+                  </svg>
+                </div>
+              </div>
+              <div className="flex flex-col gap-[8px] group-[.sidebar]:mx-auto group-[.sidebar]:w-[44px] max-lg:!w-full max-lg:!mx-0">
+                <AddProviderButton update={() => update(true)} />
+                <div className="flex gap-[8px] group-[.sidebar]:flex-col max-lg:!flex-row">
+                  {sortedIntegrations?.length > 0 && <NewPost />}
+                  {sortedIntegrations?.length > 0 &&
+                    user?.tier?.ai &&
+                    billingEnabled && <GeneratorComponent />}
+                </div>
+              </div>
+              <div className="gap-[32px] flex flex-col select-none flex-1">
+                {sortedIntegrations.length === 0 && collapseMenu === '0' && (
+                  <div className="hidden lg:flex flex-1 max-h-[500px] justify-center items-center">
+                    <div className="flex flex-col gap-[12px] text-center">
+                      <img
+                        src={
+                          mode === 'dark'
+                            ? (process.env.NEXT_PUBLIC_BASE_PATH || '') +
+                              '/no-channels.svg'
+                            : (process.env.NEXT_PUBLIC_BASE_PATH || '') +
+                              '/no-channels-colors.svg'
+                        }
+                        alt="No channels"
+                        className="mx-auto min-w-[100%]"
+                      />
+                      <div className="font-[600] text-[20px]">
+                        {t('no_channels', 'No channels yet')}
+                      </div>
+                      <div className="text-[14px]">
+                        {t('connect_your_accounts')}
+                      </div>
                     </div>
                   </div>
+                )}
+                {menuIntegrations.map((menu) => (
+                  <MenuGroupComponent
+                    collapsed={collapseMenu === '1'}
+                    changeItemGroup={changeItemGroup}
+                    key={menu.name}
+                    group={menu}
+                    mutate={mutate}
+                    continueIntegration={continueIntegration}
+                    update={update}
+                    refreshChannel={refreshChannel}
+                    totalNonDisabledChannels={totalNonDisabledChannels}
+                  />
+                ))}
+              </div>
+              <div className="mt-[5px] text-center flex flex-col">
+                {billingEnabled && user?.isLifetime && (
+                  <div>{capitalize(user?.tier?.current || '')} tier</div>
+                )}
+                <div>
+                  {process.env.NEXT_PUBLIC_VERSION
+                    ? process.env.NEXT_PUBLIC_VERSION
+                    : ''}
                 </div>
-              )}
-              {menuIntegrations.map((menu) => (
-                <MenuGroupComponent
-                  collapsed={collapseMenu === '1'}
-                  changeItemGroup={changeItemGroup}
-                  key={menu.name}
-                  group={menu}
-                  mutate={mutate}
-                  continueIntegration={continueIntegration}
-                  update={update}
-                  refreshChannel={refreshChannel}
-                  totalNonDisabledChannels={totalNonDisabledChannels}
-                />
-              ))}
-            </div>
-            <div className="mt-[5px] text-center flex flex-col">
-              {billingEnabled && user?.isLifetime && (
-                <div>{capitalize(user?.tier?.current || '')} tier</div>
-              )}
-              <div>
-                {process.env.NEXT_PUBLIC_VERSION
-                  ? process.env.NEXT_PUBLIC_VERSION
-                  : ''}
               </div>
             </div>
           </div>
-        </div>
-        <div className="bg-newBgColorInner flex-1 flex-col flex p-[20px] gap-[12px]">
-          <Filters />
-          <div className="flex-1 flex">
-            <Calendar />
+          <div className="bg-newBgColorInner flex-1 min-w-0 min-h-[520px] flex-col flex p-[12px] lg:p-[20px] gap-[12px]">
+            <Filters />
+            <div className="flex-1 flex min-w-0">
+              <Calendar />
+            </div>
           </div>
         </div>
       </CalendarWeekProvider>

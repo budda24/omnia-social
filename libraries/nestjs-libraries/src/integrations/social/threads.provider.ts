@@ -31,6 +31,11 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     // 'threads_profile_discovery',
   ];
   override maxConcurrentJob = 2; // Threads has moderate rate limits
+  override publishPacing = {
+    minIntervalMinutes: 240,
+    daily: 2,
+    weekly: 5,
+  };
   refreshCron = true;
 
   editor = 'normal' as const;
@@ -60,8 +65,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     if (body.includes('4279013')) {
       return {
         type: 'bad-body',
-        value:
-          'User restricted',
+        value: 'User restricted',
       };
     }
     if (body.includes('The media could not be fetched from this URI')) {
@@ -570,7 +574,9 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
 
       const { id: containerId } = await (
         await this.fetch(
-          `https://graph.threads.net/v1.0/${integration.internalId}/threads?${params.toString()}`,
+          `https://graph.threads.net/v1.0/${
+            integration.internalId
+          }/threads?${params.toString()}`,
           {
             method: 'POST',
           }
@@ -595,7 +601,11 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     return {
       status: 'completed',
       postId: threadId,
-      releaseURL: await this.threadPermalink(threadId, accessToken, integration),
+      releaseURL: await this.threadPermalink(
+        threadId,
+        accessToken,
+        integration
+      ),
     };
   }
 

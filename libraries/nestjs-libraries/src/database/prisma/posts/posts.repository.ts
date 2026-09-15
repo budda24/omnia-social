@@ -452,6 +452,67 @@ export class PostsRepository {
     return update;
   }
 
+  async deferPost(
+    id: string,
+    publishDate: Date,
+    reason: string,
+    maxDeferHours: number,
+    allowPublished = false
+  ) {
+    const existing = await this._post.model.post.findUnique({
+      where: { id },
+      select: {
+        state: true,
+        publishDate: true,
+        deferredFrom: true,
+      },
+    });
+    if (!existing) {
+      return { status: 'missing' as const };
+    }
+    if (
+      existing.state !== 'QUEUE' &&
+      !(allowPublished && existing.state === 'PUBLISHED')
+    ) {
+      return { status: 'stopped' as const, state: existing.state };
+    }
+
+    const deferredFrom = allowPublished
+      ? existing.publishDate
+      : existing.deferredFrom || existing.publishDate;
+    const maxUntil = dayjs(deferredFrom).add(maxDeferHours, 'hour').toDate();
+    if (publishDate.getTime() > maxUntil.getTime()) {
+      return {
+        status: 'ceiling' as const,
+        deferredFrom,
+        maxUntil,
+      };
+    }
+
+    const { count } = await this._post.model.post.updateMany({
+      where: {
+        id,
+        state: {
+          in: allowPublished ? ['QUEUE', 'PUBLISHED'] : ['QUEUE'],
+        },
+      },
+      data: {
+        publishDate,
+        deferredFrom,
+        deferReason: reason,
+      },
+    });
+
+    return count === 1
+      ? {
+          status: 'deferred' as const,
+          firstDeferral: allowPublished || existing.deferredFrom === null,
+          publishDate,
+          deferredFrom,
+        }
+      : { status: 'stopped' as const, state: existing.state };
+  }
+
   getErrorsByPostIds(postIds: string[]) {
     return this._errors.model.errors.findMany({
       where: {

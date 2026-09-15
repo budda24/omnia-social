@@ -40,6 +40,10 @@ export class XProvider extends SocialAbstract implements SocialProvider {
   scopes = [] as string[];
   stripLinks = () => !!process.env.STRIP_LINKS_FROM_X_POSTS;
   override maxConcurrentJob = 1; // X has strict rate limits (300 posts per 3 hours)
+  override publishPacing = {
+    minIntervalMinutes: 30,
+    daily: 10,
+  };
   toolTip =
     'You will be logged in into your current account, if you would like a different account, change it first on X';
 
@@ -97,7 +101,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       return {
         type: 'bad-body',
         value: 'You are not allowed to create a post with duplicate content',
-      }
+      };
     }
 
     if (body.includes('usage-capped')) {
@@ -124,8 +128,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     if (body.includes('Your account is not permitted to access this feature')) {
       return {
         type: 'bad-body',
-        value:
-          'X blocked your request',
+        value: 'X blocked your request',
       };
     }
     if (body.includes('The Tweet contains an invalid URL.')) {
@@ -586,7 +589,9 @@ export class XProvider extends SocialAbstract implements SocialProvider {
         : firstPost.message,
       ...(media_ids.length ? { media: { media_ids } } : {}),
       made_with_ai: this.assetBoolean(firstPost?.settings?.made_with_ai),
-      paid_partnership: this.assetBoolean(firstPost?.settings?.paid_partnership),
+      paid_partnership: this.assetBoolean(
+        firstPost?.settings?.paid_partnership
+      ),
     };
 
     const tweetResponse = await this.fetch(tweetUrl, {

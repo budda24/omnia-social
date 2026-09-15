@@ -9,6 +9,7 @@ import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   AnalyticsData,
+  PublishPacing,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Integration, Organization } from '@prisma/client';
@@ -26,8 +27,46 @@ import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/au
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { TemporalService } from 'nestjs-temporal-core';
 import { OmniaPlatformService } from '@gitroom/nestjs-libraries/omnia/omnia.platform.service';
+import {
+  envPositive,
+  resolvePacing,
+  temporalDate,
+} from '@gitroom/nestjs-libraries/database/prisma/integrations/publish-pacing';
+
+export { resolvePacing } from '@gitroom/nestjs-libraries/database/prisma/integrations/publish-pacing';
 
 dayjs.extend(utc);
+
+const positive = (value: number | undefined) =>
+  Number.isFinite(value) && Number(value) > 0 ? Number(value) : undefined;
+
+function configuredPacing(
+  provider: SocialProvider,
+  integration: Integration
+): PublishPacing {
+  const suffix = integration.providerIdentifier
+    .replace(/[^a-zA-Z0-9]/g, '_')
+    .toUpperCase();
+  const defaults = provider.publishPacing || {};
+
+  return {
+    minIntervalMinutes: positive(
+      integration.publishMinIntervalMinutes ??
+        envPositive(`PUBLISH_MIN_INTERVAL_MINUTES_${suffix}`) ??
+        defaults.minIntervalMinutes
+    ),
+    daily: positive(
+      integration.publishDailyLimit ??
+        envPositive(`PUBLISH_DAILY_LIMIT_${suffix}`) ??
+        defaults.daily
+    ),
+    weekly: positive(
+      integration.publishWeeklyLimit ??
+        envPositive(`PUBLISH_WEEKLY_LIMIT_${suffix}`) ??
+        defaults.weekly
+    ),
+  };
+}
 
 @Injectable()
 export class IntegrationService {
@@ -183,6 +222,106 @@ export class IntegrationService {
     return this._integrationRepository.getIntegrationById(org, id);
   }
 
+  async claimPublishSlot(
+    org: string,
+    integrationId: string,
+    postId: string,
+    now: Date | string
+  ) {
+    const attemptAt = temporalDate(now, 'publish attempt date');
+
+    const decide = async () => {
+      const snapshot =
+        await this._integrationRepository.getPublishPacingSnapshot(
+          org,
+          integrationId,
+          attemptAt
+        );
+      if (!snapshot) {
+        return { stopReason: 'Channel not found' } as const;
+      }
+      if (snapshot.integration.refreshNeeded) {
+        return { stopReason: 'Refresh channel needed' } as const;
+      }
+      if (snapshot.integration.disabled) {
+        return { stopReason: 'Channel disabled' } as const;
+      }
+      if (snapshot.integration.publishLeaseHolder === postId) {
+        return {
+          ownClaim: true,
+          nextPublishAllowedAt: snapshot.integration.nextPublishAllowedAt,
+        } as const;
+      }
+
+      const provider = this._integrationManager.getSocialIntegration(
+        snapshot.integration.providerIdentifier
+      );
+      const decision = resolvePacing({
+        now: attemptAt,
+        publishFrozenUntil: snapshot.integration.publishFrozenUntil,
+        publishFreezeReason: snapshot.integration.publishFreezeReason,
+        nextPublishAllowedAt: snapshot.integration.nextPublishAllowedAt,
+        pacing: configuredPacing(provider, snapshot.integration),
+        publishedAt: snapshot.publishedAt,
+      });
+
+      return { snapshot, decision } as const;
+    };
+
+    const first = await decide();
+    if ('stopReason' in first) {
+      return { claimed: false, stopReason: first.stopReason } as const;
+    }
+    if ('ownClaim' in first) {
+      return {
+        claimed: true,
+        nextPublishAllowedAt: first.nextPublishAllowedAt,
+      } as const;
+    }
+    if (first.decision.type === 'defer') {
+      return { claimed: false, ...first.decision } as const;
+    }
+
+    const claimed = await this._integrationRepository.claimPublishSlot(
+      org,
+      integrationId,
+      postId,
+      attemptAt,
+      first.decision.leaseUntil
+    );
+    if (claimed) {
+      return {
+        claimed: true,
+        nextPublishAllowedAt: first.decision.leaseUntil,
+      } as const;
+    }
+
+    const afterConflict = await decide();
+    if ('stopReason' in afterConflict) {
+      return {
+        claimed: false,
+        stopReason: afterConflict.stopReason,
+      } as const;
+    }
+    if ('ownClaim' in afterConflict) {
+      return {
+        claimed: true,
+        nextPublishAllowedAt: afterConflict.nextPublishAllowedAt,
+      } as const;
+    }
+    if (afterConflict.decision.type === 'defer') {
+      return { claimed: false, ...afterConflict.decision } as const;
+    }
+
+    return {
+      claimed: false,
+      type: 'defer' as const,
+      deferUntil: new Date(attemptAt.getTime() + 1000),
+      reason: 'Another queued post is claiming this channel',
+      jitterWindowMs: 0,
+    };
+  }
+
   async refreshToken(provider: SocialProvider, refresh: string) {
     try {
       const { refreshToken, accessToken, expiresIn } =
@@ -298,7 +437,10 @@ export class IntegrationService {
   }
 
   async disableIntegrations(org: string, totalChannels: number) {
-    const out = await this._integrationRepository.disableIntegrations(org, totalChannels);
+    const out = await this._integrationRepository.disableIntegrations(
+      org,
+      totalChannels
+    );
     await this._omnia.mirrorOrganization(org);
     return out;
   }

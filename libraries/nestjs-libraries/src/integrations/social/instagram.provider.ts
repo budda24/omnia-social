@@ -46,6 +46,11 @@ export class InstagramProvider
   // direct-message half, which upstream never asks for.
   optionalScopes = ['instagram_manage_messages'];
   override maxConcurrentJob = 400;
+  override publishPacing = {
+    minIntervalMinutes: 240,
+    daily: 2,
+    weekly: 5,
+  };
   editor = 'normal' as const;
   dto = InstagramDto;
   maxLength() {
@@ -360,7 +365,7 @@ export class InstagramProvider
       return {
         type: 'retry' as const,
         value: 'Could not upload your media',
-      }
+      };
     }
 
     if (body.indexOf('2207077') > -1) {
@@ -373,8 +378,9 @@ export class InstagramProvider
     if (body.indexOf('too little or too many attachments') > -1) {
       return {
         type: 'bad-body' as const,
-        value: 'Instagram carousel should have between 2 and 10 media attachments',
-      }
+        value:
+          'Instagram carousel should have between 2 and 10 media attachments',
+      };
     }
 
     if (body.indexOf('2207027') > -1) {
@@ -891,7 +897,9 @@ export class InstagramProvider
       // re-running this is safe)
       const { id: containerId } = await (
         await this.fetch(
-          `https://${pendingData.type}/v20.0/${igId}/media?caption=${encodeURIComponent(
+          `https://${
+            pendingData.type
+          }/v20.0/${igId}/media?caption=${encodeURIComponent(
             pendingData.message || ''
           )}&media_type=CAROUSEL&children=${encodeURIComponent(
             pendingData.containers.join(',')

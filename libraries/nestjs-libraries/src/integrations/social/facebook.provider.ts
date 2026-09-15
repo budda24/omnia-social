@@ -53,6 +53,11 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
   // and the platform reports the inbox as unavailable rather than showing an empty one.
   optionalScopes = ['pages_messaging'];
   override maxConcurrentJob = 500; // Facebook has reasonable rate limits
+  override publishPacing = {
+    minIntervalMinutes: 240,
+    daily: 2,
+    weekly: 7,
+  };
   editor = 'normal' as const;
   maxLength() {
     return 63206;
@@ -129,7 +134,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       return {
         type: 'bad-body' as const,
         value: 'Invalid file',
-      }
+      };
     }
 
     if (body.indexOf('1404102') > -1) {

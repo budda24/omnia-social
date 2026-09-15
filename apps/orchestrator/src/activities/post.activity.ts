@@ -52,6 +52,18 @@ function slimPost(post: any) {
   return rest;
 }
 
+function stableJitter(value: string, windowMs: number) {
+  if (windowMs <= 0) {
+    return 0;
+  }
+  let hash = 2166136261;
+  for (const byte of Buffer.from(value)) {
+    hash ^= byte;
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % windowMs;
+}
+
 @Injectable()
 @Activity()
 export class PostActivity {
@@ -72,12 +84,60 @@ export class PostActivity {
   }
 
   @ActivityMethod()
+  async claimPublishSlot(
+    orgId: string,
+    integrationId: string,
+    postId: string,
+    attemptAt: Date
+  ) {
+    const result = await this._integrationService.claimPublishSlot(
+      orgId,
+      integrationId,
+      postId,
+      attemptAt
+    );
+    if (
+      !result.claimed &&
+      'deferUntil' in result &&
+      result.jitterWindowMs > 0
+    ) {
+      return {
+        ...result,
+        deferUntil: new Date(
+          result.deferUntil.getTime() +
+            stableJitter(postId, result.jitterWindowMs)
+        ),
+      };
+    }
+    return result;
+  }
+
+  @ActivityMethod()
+  async deferPost(
+    postId: string,
+    publishDate: Date,
+    reason: string,
+    allowPublished = false
+  ) {
+    const configured = Number(process.env.PUBLISH_DEFER_MAX_HOURS);
+    const maxDeferHours =
+      Number.isFinite(configured) && configured > 0 ? configured : 24;
+    return this._postService.deferPost(
+      postId,
+      publishDate,
+      reason,
+      maxDeferHours,
+      allowPublished
+    );
+  }
+
+  @ActivityMethod()
   async searchForMissingThreeHoursPosts() {
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
       await this._temporalService.client
         .getRawClient()
-        .workflow.signalWithStart('postWorkflowV106', {
+        .workflow.signalWithStart('postWorkflowV107', {
           workflowId: `post_${post.id}`,
           taskQueue: 'main',
           signal: 'poke',

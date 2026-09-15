@@ -32,7 +32,7 @@ export interface IAuthenticator {
     integrationId: string,
     accessToken: string,
     postId: string,
-    fromDate: number,
+    fromDate: number
   ): Promise<AnalyticsData[]>;
   changeNickname?(
     id: string,
@@ -56,7 +56,6 @@ export interface AnalyticsData {
   percentageChange: number;
 }
 
-
 export type GenerateAuthUrlResponse = {
   url: string;
   codeVerifier: string;
@@ -79,6 +78,12 @@ export type AuthTokenDetails = {
     value: any;
     regex?: string;
   }[];
+};
+
+export type PublishPacing = {
+  minIntervalMinutes?: number;
+  daily?: number;
+  weekly?: number;
 };
 
 export interface ISocialMediaIntegration {
@@ -163,6 +168,7 @@ export interface SocialProvider
   extends IAuthenticator,
     ISocialMediaIntegration {
   identifier: string;
+  publishPacing?: PublishPacing;
   refreshWait?: boolean;
   convertToJPEG?: boolean;
   stripLinks?: () => boolean;

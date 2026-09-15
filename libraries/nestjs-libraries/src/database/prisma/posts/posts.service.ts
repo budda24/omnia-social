@@ -20,6 +20,7 @@ import { GetPostsListDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.
 import { shuffle } from 'lodash';
 import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generator/create.generated.posts.dto';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { temporalDate } from '@gitroom/nestjs-libraries/database/prisma/integrations/publish-pacing';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import utc from 'dayjs/plugin/utc';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
@@ -726,7 +727,7 @@ export class PostsService {
     try {
       await this._temporalService.client
         .getRawClient()
-        ?.workflow.start('postWorkflowV106', {
+        ?.workflow.start('postWorkflowV107', {
           workflowId: `post_${postId}`,
           taskQueue: 'main',
           workflowIdConflictPolicy: 'TERMINATE_EXISTING',
@@ -939,6 +940,23 @@ export class PostsService {
 
   async changeState(id: string, state: State, err?: any, body?: any) {
     return this._postRepository.changeState(id, state, err, body);
+  }
+
+  async deferPost(
+    id: string,
+    publishDate: Date | string,
+    reason: string,
+    maxDeferHours: number,
+    allowPublished = false
+  ) {
+    const deferredUntil = temporalDate(publishDate, 'deferred publish date');
+    return this._postRepository.deferPost(
+      id,
+      deferredUntil,
+      reason,
+      maxDeferHours,
+      allowPublished
+    );
   }
 
   async changePostStatus(

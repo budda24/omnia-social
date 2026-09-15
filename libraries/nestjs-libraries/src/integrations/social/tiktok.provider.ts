@@ -43,6 +43,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     'user.info.stats',
   ];
   override maxConcurrentJob = 10000;
+  override publishPacing = {
+    minIntervalMinutes: 60,
+    daily: 5,
+  };
   dto = TikTokDto;
   editor = 'normal' as const;
   maxLength() {

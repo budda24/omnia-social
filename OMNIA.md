@@ -86,3 +86,6 @@ The platform repo's `social/build.sh` does exactly this; `social/docker-compose.
   `scopes` is passed to `checkScopes` — a scope that is declined must not stop the channel connecting, because the
   same token also carries publishing and insights. Granted, the platform's chat can answer "what has nobody replied
   to?"; declined, it says the inbox is unavailable for that channel instead of showing an empty one.
+- `v2.23.0-omnia.27` — publish pacing claims one atomic channel slot before each publish. Concurrent posts stay
+  queued, move to their next safe time, and notify once. Provider defaults, env overrides and operator-only
+  integration columns control the interval and daily/weekly caps; a 24-hour deferral ceiling prevents stale posts.

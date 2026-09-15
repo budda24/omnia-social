@@ -312,35 +312,42 @@ model Customer {
 }
 
 model Integration {
-  id                    String                 @id @default(cuid())
-  internalId            String
-  organizationId        String
-  name                  String
-  picture               String?
-  providerIdentifier    String
-  type                  String
-  token                 String
-  disabled              Boolean                @default(false)
-  tokenExpiration       DateTime?
-  refreshToken          String?
-  profile               String?
-  deletedAt             DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime?              @updatedAt
-  inBetweenSteps        Boolean                @default(false)
-  refreshNeeded         Boolean                @default(false)
-  postingTimes          String                 @default("[{\"time\":120}, {\"time\":400}, {\"time\":700}]")
-  customInstanceDetails String?
-  customerId            String?
-  rootInternalId        String?
-  additionalSettings    String?                @default("[]")
-  exisingPlugData       ExisingPlugData[]
-  customer              Customer?              @relation(fields: [customerId], references: [id])
-  organization          Organization           @relation(fields: [organizationId], references: [id])
-  webhooks              IntegrationsWebhooks[]
-  orderItems            OrderItems[]
-  plugs                 Plugs[]
-  posts                 Post[]
+  id                        String                 @id @default(cuid())
+  internalId                String
+  organizationId            String
+  name                      String
+  picture                   String?
+  providerIdentifier        String
+  type                      String
+  token                     String
+  disabled                  Boolean                @default(false)
+  tokenExpiration           DateTime?
+  refreshToken              String?
+  profile                   String?
+  deletedAt                 DateTime?
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime?              @updatedAt
+  inBetweenSteps            Boolean                @default(false)
+  refreshNeeded             Boolean                @default(false)
+  nextPublishAllowedAt      DateTime?
+  publishLeaseHolder        String?
+  publishFrozenUntil        DateTime?
+  publishFreezeReason       String?
+  publishMinIntervalMinutes Int?
+  publishDailyLimit         Int?
+  publishWeeklyLimit        Int?
+  postingTimes              String                 @default("[{\"time\":120}, {\"time\":400}, {\"time\":700}]")
+  customInstanceDetails     String?
+  customerId                String?
+  rootInternalId            String?
+  additionalSettings        String?                @default("[]")
+  exisingPlugData           ExisingPlugData[]
+  customer                  Customer?              @relation(fields: [customerId], references: [id])
+  organization              Organization           @relation(fields: [organizationId], references: [id])
+  webhooks                  IntegrationsWebhooks[]
+  orderItems                OrderItems[]
+  plugs                     Plugs[]
+  posts                     Post[]
 
   @@unique([organizationId, internalId])
   @@index([rootInternalId])
@@ -352,6 +359,7 @@ model Integration {
   @@index([customerId])
   @@index([inBetweenSteps])
   @@index([refreshNeeded])
+  @@index([publishFrozenUntil])
   @@index([disabled])
 }
 
@@ -413,6 +421,8 @@ model Post {
   lastMessageId              String?
   intervalInDays             Int?
   error                      String?
+  deferredFrom               DateTime?
+  deferReason                String?
   createdAt                  DateTime                  @default(now())
   updatedAt                  DateTime                  @updatedAt
   deletedAt                  DateTime?
@@ -443,6 +453,7 @@ model Post {
   @@index([updatedAt])
   @@index([releaseURL])
   @@index([integrationId])
+  @@index([integrationId, state, publishDate])
 }
 
 model Notifications {

@@ -383,6 +383,92 @@ export class IntegrationRepository {
     });
   }
 
+  async getPublishPacingSnapshot(org: string, id: string, now: Date) {
+    const weekStart = dayjs.utc(now).subtract(7, 'day').toDate();
+    const [integration, published] = await Promise.all([
+      this._integration.model.integration.findFirst({
+        where: {
+          organizationId: org,
+          id,
+          deletedAt: null,
+        },
+      }),
+      this._posts.model.post.findMany({
+        where: {
+          organizationId: org,
+          integrationId: id,
+          state: 'PUBLISHED',
+          deletedAt: null,
+          parentPostId: null,
+          publishDate: {
+            gte: weekStart,
+            lte: now,
+          },
+        },
+        select: {
+          publishDate: true,
+        },
+        orderBy: {
+          publishDate: 'asc',
+        },
+      }),
+    ]);
+
+    if (!integration) {
+      return null;
+    }
+
+    return {
+      integration,
+      publishedAt: published.map(({ publishDate }) => publishDate),
+    };
+  }
+
+  async claimPublishSlot(
+    org: string,
+    id: string,
+    postId: string,
+    now: Date,
+    leaseUntil: Date
+  ) {
+    const { count } = await this._integration.model.integration.updateMany({
+      where: {
+        organizationId: org,
+        id,
+        deletedAt: null,
+        disabled: false,
+        refreshNeeded: false,
+        OR: [
+          {
+            publishLeaseHolder: postId,
+          },
+          {
+            AND: [
+              {
+                OR: [
+                  { nextPublishAllowedAt: null },
+                  { nextPublishAllowedAt: { lte: now } },
+                ],
+              },
+              {
+                OR: [
+                  { publishFrozenUntil: null },
+                  { publishFrozenUntil: { lte: now } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      data: {
+        nextPublishAllowedAt: leaseUntil,
+        publishLeaseHolder: postId,
+      },
+    });
+
+    return count === 1;
+  }
+
   async getIntegrationForOrder(
     id: string,
     order: string,

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   ValidationPipe,
 } from '@nestjs/common';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
@@ -531,6 +532,9 @@ export class PostsService {
 
   async getPost(orgId: string, id: string, convertToJPEG = false) {
     const posts = await this.getPostsRecursively(id, true, orgId, true);
+    if (!posts.length) {
+      throw new NotFoundException('Post not found');
+    }
     const list = {
       group: posts?.[0]?.group,
       posts: await Promise.all(

@@ -210,7 +210,9 @@ export class PublicIntegrationsController {
     // past any real library, and anything beyond it is a typo or a probe either way.
     const parsed = Number(page);
     const pageNumber =
-      Number.isFinite(parsed) && parsed >= 1 ? Math.min(Math.floor(parsed), MAX_MEDIA_PAGE) : 1;
+      Number.isFinite(parsed) && parsed >= 1
+        ? Math.min(Math.floor(parsed), MAX_MEDIA_PAGE)
+        : 1;
     return this._mediaService.getMedia(org.id, pageNumber, search);
   }
 
@@ -272,6 +274,16 @@ export class PublicIntegrationsController {
       posts,
       // comments,
     };
+  }
+
+  /** One post from this organization, without expanding a calendar range (OMN-185). */
+  @Get('/posts/:id')
+  async getPostById(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._postsService.getPost(org.id, id);
   }
 
   @Post('/posts')

@@ -58,6 +58,7 @@ import copy from 'copy-to-clipboard';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { Button } from '@gitroom/react/form/button';
+import { queuedPostDeferReason } from './publish.visibility';
 
 // Extend dayjs with necessary plugins
 extend(isSameOrAfter);
@@ -1012,6 +1013,7 @@ const CalendarItem: FC<{
     user?.impersonate &&
     post.creationMethod &&
     post.creationMethod !== 'UNKNOWN';
+  const deferReason = queuedPostDeferReason(post);
   const preview = useCallback(() => {
     window.open(`/p/` + post.id + '?share=true', '_blank');
   }, [post]);
@@ -1158,6 +1160,15 @@ const CalendarItem: FC<{
           />
         </div>
         <div className="w-full flex-1 flex flex-col min-h-[40px]">
+          {deferReason && (
+            <div
+              className="mb-[3px] max-w-full truncate rounded-full border border-amber-400/60 bg-amber-400/15 px-[6px] py-[2px] text-start text-[10px] font-medium text-amber-300"
+              data-tooltip-id="tooltip"
+              data-tooltip-content={deferReason}
+            >
+              {deferReason}
+            </div>
+          )}
           <div className="text-start">
             {state === 'DRAFT' ? t('draft', 'Draft') + ': ' : ''}
           </div>

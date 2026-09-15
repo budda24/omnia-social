@@ -48,6 +48,8 @@ export const CalendarContext = createContext({
   }>,
   integrations: [] as (Integrations & {
     refreshNeeded?: boolean;
+    publishFrozenUntil?: string | null;
+    publishFreezeReason?: string | null;
   })[],
   trendings: [] as string[],
   posts: [] as Array<
@@ -107,6 +109,9 @@ export interface Integrations {
   changeProfilePicture: boolean;
   additionalSettings: string;
   changeNickName: boolean;
+  refreshNeeded?: boolean;
+  publishFrozenUntil?: string | null;
+  publishFreezeReason?: string | null;
   time: {
     time: number;
   }[];

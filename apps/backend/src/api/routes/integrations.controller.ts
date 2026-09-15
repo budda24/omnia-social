@@ -106,6 +106,8 @@ export class IntegrationsController {
             identifier: p.providerIdentifier,
             inBetweenSteps: p.inBetweenSteps,
             refreshNeeded: p.refreshNeeded,
+            publishFrozenUntil: p.publishFrozenUntil,
+            publishFreezeReason: p.publishFreezeReason,
             isCustomFields: !!findIntegration.customFields,
             ...(findIntegration.customFields
               ? { customFields: await findIntegration.customFields() }

@@ -26,6 +26,8 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import useCookie from 'react-use-cookie';
 import { Onboarding } from '@gitroom/frontend/components/onboarding/onboarding';
+import { channelFreezeVisibility } from './publish.visibility';
+import dayjs from 'dayjs';
 
 export const SVGLine = () => {
   return (
@@ -221,6 +223,8 @@ export const MenuComponent: FC<
       changeProfilePicture: boolean;
       changeNickName: boolean;
       refreshNeeded?: boolean;
+      publishFrozenUntil?: string | Date | null;
+      publishFreezeReason?: string | null;
     };
   }
 > = (props) => {
@@ -241,6 +245,7 @@ export const MenuComponent: FC<
       id: integration.id,
     },
   }));
+  const freeze = channelFreezeVisibility(integration);
   return (
     <div
       // @ts-ignore
@@ -344,6 +349,17 @@ export const MenuComponent: FC<
       >
         {integration.name}
       </div>
+      {freeze && (
+        <div
+          className="pointer-events-none max-w-[190px] truncate rounded-full border border-amber-400/60 bg-amber-400/15 px-[7px] py-[3px] text-[10px] font-medium text-amber-300"
+          data-tooltip-id="tooltip"
+          data-tooltip-content={freeze.reason}
+        >
+          {t('cooling_down_until', 'Cooling down until {{time}}', {
+            time: dayjs(freeze.until).format('HH:mm'),
+          })}
+        </div>
+      )}
       <Menu
         canChangeProfilePicture={integration.changeProfilePicture}
         canChangeNickName={integration.changeNickName}

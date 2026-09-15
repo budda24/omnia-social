@@ -112,8 +112,9 @@ export class InstagramProvider
     status: number
   ):
     | {
-        type: 'refresh-token' | 'bad-body' | 'retry';
+        type: 'refresh-token' | 'bad-body' | 'retry' | 'platform-block';
         value: string;
+        cooldownHours?: number;
       }
     | undefined {
     if (body.indexOf('An unknown error occurred') > -1) {
@@ -304,16 +305,17 @@ export class InstagramProvider
 
     if (body.indexOf('Page request limit reached') > -1) {
       return {
-        type: 'bad-body' as const,
-        value: 'Page posting for today is limited, please try again tomorrow',
+        type: 'platform-block' as const,
+        value: 'Instagram reached the page request limit',
+        cooldownHours: 24,
       };
     }
 
     if (body.indexOf('2207042') > -1) {
       return {
-        type: 'bad-body' as const,
-        value:
-          'You have reached the maximum of 25 posts per day, allowed for your account',
+        type: 'platform-block' as const,
+        value: 'Instagram reached the daily publishing limit',
+        cooldownHours: 24,
       };
     }
 
@@ -348,16 +350,17 @@ export class InstagramProvider
 
     if (body.indexOf('2207051') > -1) {
       return {
-        type: 'bad-body' as const,
-        value: 'Instagram blocked your request',
+        type: 'platform-block' as const,
+        value: 'Instagram restricted publishing to protect its community',
+        cooldownHours: 48,
       };
     }
 
     if (body.indexOf('2207001') > -1) {
       return {
-        type: 'bad-body' as const,
-        value:
-          'Instagram detected that your post is spam, please try again with different content',
+        type: 'platform-block' as const,
+        value: 'Instagram temporarily restricted publishing activity',
+        cooldownHours: 24,
       };
     }
 

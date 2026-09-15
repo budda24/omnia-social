@@ -258,4 +258,96 @@ describe('Social publish pacing (OMN-273)', () => {
     });
     expect(countPublishedPosts).not.toHaveBeenCalled();
   });
+
+  test('an atomic freeze only extends the active freeze', async () => {
+    const frozenUntil = new Date(now.getTime() + 48 * hour);
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const findFirst = jest.fn().mockResolvedValue({
+      id: 'channel-1',
+      publishFrozenUntil: frozenUntil,
+    });
+    const repository = Object.create(IntegrationRepository.prototype) as any;
+    repository._integration = {
+      model: { integration: { updateMany, findFirst } },
+    };
+
+    await expect(
+      repository.freezeChannel(
+        'org-1',
+        'channel-1',
+        frozenUntil,
+        'provider block'
+      )
+    ).resolves.toMatchObject({ changed: true });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        organizationId: 'org-1',
+        id: 'channel-1',
+        deletedAt: null,
+        OR: [
+          { publishFrozenUntil: null },
+          { publishFrozenUntil: { lt: frozenUntil } },
+        ],
+      },
+      data: {
+        publishFrozenUntil: frozenUntil,
+        publishFreezeReason: 'provider block',
+      },
+    });
+  });
+
+  test('one freeze event mirrors and notifies only once', async () => {
+    const frozenUntil = new Date(now.getTime() + 48 * hour);
+    const freezeChannel = jest
+      .fn()
+      .mockResolvedValueOnce({
+        changed: true,
+        integration: {
+          id: 'channel-1',
+          name: 'Omnia Instagram',
+          providerIdentifier: 'instagram',
+        },
+      })
+      .mockResolvedValueOnce({
+        changed: false,
+        integration: {
+          id: 'channel-1',
+          name: 'Omnia Instagram',
+          providerIdentifier: 'instagram',
+          publishFrozenUntil: frozenUntil,
+        },
+      });
+    const mirrorChannelById = jest.fn();
+    const inAppNotification = jest.fn();
+    const service = Object.create(IntegrationService.prototype) as any;
+    service._integrationRepository = { freezeChannel };
+    service._omnia = { mirrorChannelById };
+    service._notificationService = { inAppNotification };
+
+    await service.freezeChannel(
+      'org-1',
+      'channel-1',
+      48,
+      'Instagram restricted publishing',
+      now
+    );
+    await service.freezeChannel(
+      'org-1',
+      'channel-1',
+      48,
+      'Instagram restricted publishing',
+      now
+    );
+
+    expect(mirrorChannelById).toHaveBeenCalledTimes(1);
+    expect(inAppNotification).toHaveBeenCalledTimes(1);
+    expect(inAppNotification).toHaveBeenCalledWith(
+      'org-1',
+      expect.stringContaining('instagram'),
+      expect.stringContaining(frozenUntil.toISOString()),
+      true,
+      true,
+      'fail'
+    );
+  });
 });

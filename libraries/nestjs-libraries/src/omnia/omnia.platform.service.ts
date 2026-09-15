@@ -154,6 +154,7 @@ export class OmniaPlatformService {
       | 'profile'
       | 'refreshNeeded'
       | 'inBetweenSteps'
+      | 'publishFrozenUntil'
     >
   ) {
     if (!OmniaPlatformService.configured) return;
@@ -181,6 +182,9 @@ export class OmniaPlatformService {
           : null,
         disabled: !!integration.disabled,
         refreshNeeded: !!integration.refreshNeeded,
+        publishFrozenUntil: integration.publishFrozenUntil
+          ? new Date(integration.publishFrozenUntil).toISOString()
+          : null,
         deleted: !!integration.deletedAt,
       });
       const label = `${integration.providerIdentifier}/${integration.internalId}`;

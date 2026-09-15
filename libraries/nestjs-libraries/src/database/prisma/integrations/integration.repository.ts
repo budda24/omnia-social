@@ -362,6 +362,33 @@ export class IntegrationRepository {
     });
   }
 
+  async freezeChannel(
+    org: string,
+    id: string,
+    frozenUntil: Date,
+    reason: string
+  ) {
+    const { count } = await this._integration.model.integration.updateMany({
+      where: {
+        organizationId: org,
+        id,
+        deletedAt: null,
+        OR: [
+          { publishFrozenUntil: null },
+          { publishFrozenUntil: { lt: frozenUntil } },
+        ],
+      },
+      data: {
+        publishFrozenUntil: frozenUntil,
+        publishFreezeReason: reason,
+      },
+    });
+    const integration = await this._integration.model.integration.findFirst({
+      where: { organizationId: org, id, deletedAt: null },
+    });
+    return { changed: count === 1, integration };
+  }
+
   updateNameAndUrl(id: string, name: string, url: string) {
     return this._integration.model.integration.update({
       where: {

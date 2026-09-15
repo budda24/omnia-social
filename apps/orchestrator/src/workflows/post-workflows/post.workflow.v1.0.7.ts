@@ -62,6 +62,7 @@ const {
   getPost,
   claimPublishSlot,
   deferPost,
+  freezeChannel,
   inAppNotification,
   changeState,
   updatePost,
@@ -268,14 +269,21 @@ export async function postWorkflowV107({
   // needed, and tell the caller what to do.
   // 'retry' - the token was refreshed, run the action again
   // 'stop' - the token could not be refreshed
-  // 'bad-body' - the platform rejected the action
+  // 'platform-block' - the platform paused publishing for this channel
+  // 'bad-body' - the platform rejected the content
   // 'timeout' - the activity timed out, its outcome is unknown
   // 'unknown' - anything else (transient errors)
   const handleActivityError = async (
     err: unknown,
     getIntegration?: () => Promise<any>
   ): Promise<{
-    type: 'retry' | 'stop' | 'bad-body' | 'timeout' | 'unknown';
+    type:
+      | 'retry'
+      | 'stop'
+      | 'platform-block'
+      | 'bad-body'
+      | 'timeout'
+      | 'unknown';
     message: string;
   }> => {
     if (err instanceof ActivityFailure && err.cause instanceof TimeoutFailure) {
@@ -286,6 +294,32 @@ export async function postWorkflowV107({
       err instanceof ActivityFailure && err.cause instanceof ApplicationFailure
         ? err.cause
         : undefined;
+
+    if (cause?.type === 'platform_block') {
+      const integration = getIntegration
+        ? await getIntegration()
+        : post.integration;
+      if (!integration) {
+        return { type: 'stop', message: 'Channel not found' };
+      }
+      const detail = cause.details?.[0] as
+        | { cooldownHours?: number }
+        | undefined;
+      const frozen = await freezeChannel(
+        integration.organizationId || organizationId,
+        integration.id,
+        detail?.cooldownHours || 24,
+        cause.message || 'The platform temporarily blocked publishing',
+        new Date()
+      );
+      const frozenUntil = temporalDate(frozen.frozenUntil).toISOString();
+      return {
+        type: 'platform-block',
+        message: `${
+          cause.message || 'The platform temporarily blocked publishing'
+        }. Publishing is paused until ${frozenUntil}.`,
+      };
+    }
 
     if (cause?.type === 'refresh_token') {
       const refresh = await refreshTokenWithCause(
@@ -385,6 +419,16 @@ export async function postWorkflowV107({
         // already accepted the post - warn about a possible live post
         if (handle.type === 'stop') {
           await markUnconfirmed(err);
+          return false;
+        }
+
+        if (handle.type === 'platform-block') {
+          await changeState(
+            postsList[0].id,
+            'ERROR',
+            handle.message,
+            postsList
+          );
           return false;
         }
 
@@ -547,9 +591,14 @@ export async function postWorkflowV107({
         }
 
         // for other errors, change state and inform the user if needed
-        await changeState(postsList[0].id, 'ERROR', err, postsList);
+        await changeState(
+          postsList[0].id,
+          'ERROR',
+          handle.type === 'platform-block' ? handle.message : err,
+          postsList
+        );
 
-        if (handle.type === 'stop') {
+        if (handle.type === 'stop' || handle.type === 'platform-block') {
           return false;
         }
 
@@ -642,7 +691,11 @@ export async function postWorkflowV107({
             getIntegrationById(organizationId, todo.integration)
           );
 
-          if (handle.type === 'stop' || handle.type === 'bad-body') {
+          if (
+            handle.type === 'stop' ||
+            handle.type === 'bad-body' ||
+            handle.type === 'platform-block'
+          ) {
             break;
           }
 
@@ -678,7 +731,11 @@ export async function postWorkflowV107({
         } catch (err) {
           const handle = await handleActivityError(err);
 
-          if (handle.type === 'stop' || handle.type === 'bad-body') {
+          if (
+            handle.type === 'stop' ||
+            handle.type === 'bad-body' ||
+            handle.type === 'platform-block'
+          ) {
             break;
           }
 

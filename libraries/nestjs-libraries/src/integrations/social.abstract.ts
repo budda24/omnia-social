@@ -66,6 +66,36 @@ export class BadBody extends ApplicationFailure {
   }
 }
 
+export class PlatformBlock extends ApplicationFailure {
+  constructor(
+    identifier: string,
+    json: string,
+    body: BodyInit,
+    message: string,
+    cooldownHours: number
+  ) {
+    super(
+      truncateForTemporal(message, MAX_FAILURE_MESSAGE),
+      'platform_block',
+      true,
+      [
+        {
+          identifier,
+          json: truncateForTemporal(json, MAX_FAILURE_FIELD),
+          body: truncateForTemporal(body, MAX_FAILURE_FIELD),
+          cooldownHours,
+        },
+      ]
+    );
+  }
+}
+
+export type SocialErrorResult = {
+  type: 'refresh-token' | 'bad-body' | 'retry' | 'platform-block';
+  value: string;
+  cooldownHours?: number;
+};
+
 export class NotEnoughScopes {
   constructor(
     public message = 'Not enough scopes, when choosing a provider, please add all the scopes'
@@ -94,9 +124,7 @@ export abstract class SocialAbstract {
   public handleErrors(
     body: string,
     status: number
-  ):
-    | { type: 'refresh-token' | 'bad-body' | 'retry'; value: string }
-    | undefined {
+  ): SocialErrorResult | undefined {
     return undefined;
   }
 
@@ -306,6 +334,16 @@ export abstract class SocialAbstract {
         (typeof data === 'string' ? data : safeStringify(data || {})) || '{}';
       const handleError = this.handleErrors(json, status);
 
+      if (handleError?.type === 'platform-block') {
+        throw new PlatformBlock(
+          identifier,
+          json,
+          '{}',
+          handleError.value,
+          handleError.cooldownHours || 24
+        );
+      }
+
       if (
         totalRetries <= 2 &&
         (status === 429 ||
@@ -362,6 +400,15 @@ export abstract class SocialAbstract {
     }
 
     if (value && value?.err && value?.value) {
+      if (value.type === 'platform-block') {
+        throw new PlatformBlock(
+          '',
+          safeStringify(globalErr),
+          {} as any,
+          value.value || '',
+          value.cooldownHours || 24
+        );
+      }
       if (value.type === 'refresh-token') {
         throw new RefreshToken(
           '',
@@ -406,13 +453,23 @@ export abstract class SocialAbstract {
       json = '{}';
     }
 
+    const handleError = this.handleErrors(json || '{}', request.status);
+
+    if (handleError?.type === 'platform-block') {
+      throw new PlatformBlock(
+        identifier,
+        json,
+        options.body || '{}',
+        handleError.value,
+        handleError.cooldownHours || 24
+      );
+    }
+
     if (totalRetries > 2) {
       // Include the platform's actual response body so the failure is
       // diagnosable, instead of an empty '{}'.
       throw new BadBody(identifier, json, options.body || '{}', message);
     }
-
-    const handleError = this.handleErrors(json || '{}', request.status);
 
     if (
       request.status === 429 ||

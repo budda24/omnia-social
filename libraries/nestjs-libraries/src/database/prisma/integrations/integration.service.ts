@@ -416,6 +416,48 @@ export class IntegrationService {
     return out;
   }
 
+  async freezeChannel(
+    org: string,
+    id: string,
+    cooldownHours: number,
+    reason: string,
+    blockedAt: Date | string
+  ) {
+    const start = temporalDate(blockedAt, 'platform block date');
+    const hours =
+      Number.isFinite(cooldownHours) && cooldownHours > 0 ? cooldownHours : 24;
+    const frozenUntil = new Date(start.getTime() + hours * 60 * 60_000);
+    const result = await this._integrationRepository.freezeChannel(
+      org,
+      id,
+      frozenUntil,
+      reason
+    );
+
+    if (!result.integration) {
+      return { changed: false, frozenUntil, stopReason: 'Channel not found' };
+    }
+    if (!result.changed) {
+      return {
+        changed: false,
+        frozenUntil: result.integration.publishFrozenUntil || frozenUntil,
+      };
+    }
+
+    await this._omnia.mirrorChannelById(id);
+    await this._notificationService.inAppNotification(
+      org,
+      `Publishing paused for ${result.integration.providerIdentifier}`,
+      `${reason}. Publishing for ${
+        result.integration.name
+      } is paused until ${frozenUntil.toISOString()}.`,
+      true,
+      true,
+      'fail'
+    );
+    return { changed: true, frozenUntil };
+  }
+
   async setBetweenRefreshSteps(id: string) {
     return this._integrationRepository.setBetweenRefreshSteps(id);
   }

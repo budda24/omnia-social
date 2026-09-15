@@ -81,8 +81,9 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     status: number
   ):
     | {
-        type: 'refresh-token' | 'bad-body';
+        type: 'refresh-token' | 'bad-body' | 'platform-block';
         value: string;
+        cooldownHours?: number;
       }
     | undefined {
     // Access token validation errors - require re-authentication
@@ -109,8 +110,9 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
 
     if (body.indexOf('1390008') > -1) {
       return {
-        type: 'bad-body' as const,
-        value: 'You are posting too fast, please slow down',
+        type: 'platform-block' as const,
+        value: 'Facebook temporarily limited publishing frequency',
+        cooldownHours: 6,
       };
     }
 

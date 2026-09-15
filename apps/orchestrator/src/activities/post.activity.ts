@@ -113,6 +113,23 @@ export class PostActivity {
   }
 
   @ActivityMethod()
+  freezeChannel(
+    orgId: string,
+    integrationId: string,
+    cooldownHours: number,
+    reason: string,
+    blockedAt: Date
+  ) {
+    return this._integrationService.freezeChannel(
+      orgId,
+      integrationId,
+      cooldownHours,
+      reason,
+      blockedAt
+    );
+  }
+
+  @ActivityMethod()
   async deferPost(
     postId: string,
     publishDate: Date,

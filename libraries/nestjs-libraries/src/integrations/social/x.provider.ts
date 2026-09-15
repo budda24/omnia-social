@@ -61,8 +61,9 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
   override handleErrors(body: string):
     | {
-        type: 'refresh-token' | 'bad-body' | 'retry';
+        type: 'refresh-token' | 'bad-body' | 'retry' | 'platform-block';
         value: string;
+        cooldownHours?: number;
       }
     | undefined {
     if (body.includes('You are not permitted to perform this action')) {
@@ -106,8 +107,9 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
     if (body.includes('usage-capped')) {
       return {
-        type: 'bad-body',
-        value: 'Posting failed - capped reached. Please try again later',
+        type: 'platform-block',
+        value: 'X reached the publishing usage cap',
+        cooldownHours: 24,
       };
     }
 

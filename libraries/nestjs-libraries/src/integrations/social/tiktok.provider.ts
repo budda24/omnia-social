@@ -76,8 +76,9 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
   override handleErrors(body: string):
     | {
-        type: 'refresh-token' | 'bad-body';
+        type: 'refresh-token' | 'bad-body' | 'platform-block';
         value: string;
+        cooldownHours?: number;
       }
     | undefined {
     // Authentication/Authorization errors - require re-authentication
@@ -107,8 +108,9 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     // Rate limiting errors
     if (body.indexOf('rate_limit_exceeded') > -1) {
       return {
-        type: 'bad-body' as const,
-        value: 'TikTok API rate limit exceeded, please try again later',
+        type: 'platform-block' as const,
+        value: 'TikTok reached the publishing rate limit',
+        cooldownHours: 6,
       };
     }
 

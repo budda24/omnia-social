@@ -45,20 +45,20 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
 
   override handleErrors(body: string):
     | {
-        type: 'refresh-token' | 'bad-body';
+        type: 'refresh-token' | 'bad-body' | 'platform-block';
         value: string;
+        cooldownHours?: number;
       }
     | undefined {
-    console.log(body);
     if (body.includes('Error validating access token')) {
       return { type: 'refresh-token', value: 'Threads access token expired' };
     }
 
     if (body.includes('2207051')) {
       return {
-        type: 'bad-body',
-        value:
-          'Error from Meta: We restrict certain activity to protect our community',
+        type: 'platform-block',
+        value: 'Threads restricted publishing to protect its community',
+        cooldownHours: 48,
       };
     }
 

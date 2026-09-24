@@ -20,6 +20,7 @@ export class TikTokDto {
   })
   title: string;
 
+  @ValidateIf((p) => p.content_posting_method !== 'UPLOAD')
   @IsIn([
     'PUBLIC_TO_EVERYONE',
     'MUTUAL_FOLLOW_FRIENDS',
@@ -36,6 +37,18 @@ export class TikTokDto {
     | 'MUTUAL_FOLLOW_FRIENDS'
     | 'FOLLOWER_OF_CREATOR'
     | 'SELF_ONLY';
+
+  @IsBoolean()
+  @IsOptional()
+  disclose?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  music_usage_consent?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  branded_content_consent?: boolean;
 
   @IsBoolean()
   @JSONSchema({

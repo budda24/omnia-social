@@ -16,10 +16,21 @@ import {
 import { TikTokDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/tiktok.dto';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { createReadStream } from 'fs';
-import { getSsrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+
+export type TikTokCreatorInfo = {
+  creator_nickname: string;
+  creator_username: string;
+  privacy_level_options: string[];
+  comment_disabled: boolean;
+  duet_disabled: boolean;
+  stitch_disabled: boolean;
+  max_video_post_duration_sec: number;
+};
+const execFileAsync = promisify(execFile);
 
 @Rules(
   [
@@ -54,7 +65,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   }
 
   override async checkValidity(
-    items: Array<ValidityMedia[]>
+    items: Array<ValidityMedia[]>,
+    settings?: TikTokDto
   ): Promise<string | true> {
     const [firstItems] = items ?? [];
     if ((firstItems?.length ?? 0) === 0) {
@@ -70,6 +82,22 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       (firstItems?.[0]?.path?.indexOf?.('mp4') ?? -1) > -1
     ) {
       return 'You need one media';
+    }
+    if (settings?.content_posting_method !== 'UPLOAD') {
+      if (!settings?.privacy_level) return 'Select TikTok privacy before publishing';
+      if (!settings?.disclose && (settings?.brand_content_toggle || settings?.brand_organic_toggle)) {
+        return 'Turn on commercial content disclosure for branded content';
+      }
+      if (settings?.disclose && !settings.brand_content_toggle && !settings.brand_organic_toggle) {
+        return 'Select Your brand, Branded content, or both';
+      }
+      if (settings?.brand_content_toggle && ['SELF_ONLY', 'FOLLOWER_OF_CREATOR'].includes(settings.privacy_level)) {
+        return 'Branded content needs public or friends visibility';
+      }
+      if (!settings?.music_usage_consent) return 'Confirm TikTok music usage before publishing';
+      if (settings?.brand_content_toggle && !settings.branded_content_consent) {
+        return 'Confirm TikTok branded content policy before publishing';
+      }
     }
     return true;
   }
@@ -400,10 +428,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async maxVideoLength(accessToken: string) {
-    const {
-      data: { max_video_post_duration_sec },
-    } = await (
+  async creatorInfo(accessToken: string): Promise<TikTokCreatorInfo> {
+    const response = await (
       await fetch(
         'https://open.tiktokapis.com/v2/post/publish/creator_info/query/',
         {
@@ -415,10 +441,49 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         }
       )
     ).json();
+    if (response?.error?.code !== 'ok' || !response?.data?.privacy_level_options) {
+      throw new Error(response?.error?.message || response?.error?.code || 'TikTok creator info unavailable');
+    }
+    return response.data;
+  }
 
-    return {
-      maxDurationSeconds: max_video_post_duration_sec,
-    };
+  async validateDirectPost(
+    accessToken: string,
+    settings: TikTokDto,
+    mediaPath: string
+  ): Promise<string | true> {
+    if (settings?.content_posting_method === 'UPLOAD') return true;
+    let creator: TikTokCreatorInfo;
+    try {
+      creator = await this.creatorInfo(accessToken);
+    } catch (error) {
+      return `TikTok account cannot post now: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    if (!creator.privacy_level_options.includes(settings?.privacy_level)) {
+      return 'Selected TikTok privacy is no longer available. Refresh the composer.';
+    }
+    if (creator.comment_disabled && settings?.comment) return 'TikTok comments are disabled on this account';
+    if (hasExtension(mediaPath, 'mp4')) {
+      if (creator.duet_disabled && settings?.duet) return 'TikTok Duet is disabled on this account';
+      if (creator.stitch_disabled && settings?.stitch) return 'TikTok Stitch is disabled on this account';
+      try {
+        const ownPrefix = `${process.env.FRONTEND_URL}/uploads/`;
+        if (!mediaPath.startsWith(ownPrefix)) return 'Upload the TikTok video to the Social library first';
+        const localPath = `${process.env.UPLOAD_DIRECTORY}/${mediaPath.slice(ownPrefix.length)}`;
+        const { stdout } = await execFileAsync('ffprobe', [
+          '-v', 'error', '-show_entries', 'format=duration',
+          '-of', 'default=noprint_wrappers=1:nokey=1', localPath,
+        ], { timeout: 20000, maxBuffer: 1024 });
+        const duration = Number(stdout.trim());
+        if (!Number.isFinite(duration) || duration <= 0) return 'Cannot read TikTok video duration';
+        if (duration > creator.max_video_post_duration_sec) {
+          return `TikTok allows at most ${creator.max_video_post_duration_sec} seconds for this account`;
+        }
+      } catch {
+        return 'Cannot read TikTok video duration';
+      }
+    }
+    return true;
   }
 
   // Single status check for a publish_id, no loops and no timers: `post` returns
@@ -537,8 +602,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
             ? { title: firstPost.message }
             : {}),
           ...(isPhoto ? { description: firstPost.message } : {}),
-          privacy_level:
-            firstPost.settings.privacy_level || 'PUBLIC_TO_EVERYONE',
+          privacy_level: firstPost.settings.privacy_level,
           ...(isPhoto
             ? {}
             : { disable_duet: !this.assetBoolean(firstPost.settings.duet) }),
@@ -581,197 +645,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  // ---------------------------------------------------------------------------
-  // OLD PULL_FROM_URL IMPLEMENTATION (kept for when the TikTok PULL bug is fixed)
-  // ---------------------------------------------------------------------------
-  // private buildTikokSourceInfoBody(firstPost: PostDetails<TikTokDto>) {
-  //   const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
-  //
-  //   if (isPhoto) {
-  //     return {
-  //       post_mode:
-  //         firstPost?.settings?.content_posting_method === 'DIRECT_POST'
-  //           ? 'DIRECT_POST'
-  //           : 'MEDIA_UPLOAD',
-  //       media_type: 'PHOTO',
-  //       source_info: {
-  //         source: 'PULL_FROM_URL',
-  //         photo_cover_index: 0,
-  //         photo_images: firstPost.media?.map((p) => p.path),
-  //       },
-  //     };
-  //   }
-  //
-  //   return {
-  //     source_info: {
-  //       source: 'PULL_FROM_URL',
-  //       video_url: firstPost?.media?.[0]?.path!,
-  //       ...(firstPost?.media?.[0]?.thumbnailTimestamp!
-  //         ? {
-  //             video_cover_timestamp_ms:
-  //               firstPost?.media?.[0]?.thumbnailTimestamp!,
-  //           }
-  //         : {}),
-  //     },
-  //   };
-  // }
-  //
-  // async post(
-  //   id: string,
-  //   accessToken: string,
-  //   postDetails: PostDetails<TikTokDto>[],
-  //   integration: Integration
-  // ): Promise<PostResponse[]> {
-  //   const [firstPost] = postDetails;
-  //   const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
-  //
-  //   console.log({
-  //     ...this.buildTikokPostInfoBody(firstPost),
-  //     ...this.buildTikokSourceInfoBody(firstPost),
-  //   });
-  //   const {
-  //     data: { publish_id },
-  //   } = await (
-  //     await this.fetch(
-  //       `https://open.tiktokapis.com/v2/post/publish${this.postingMethod(
-  //         firstPost.settings.content_posting_method,
-  //         !hasExtension(firstPost?.media?.[0]?.path, 'mp4')
-  //       )}`,
-  //       {
-  //         method: 'POST',
-  //         headers: {
-  //           'Content-Type': 'application/json; charset=UTF-8',
-  //           Authorization: `Bearer ${accessToken}`,
-  //         },
-  //         body: JSON.stringify({
-  //           ...this.buildTikokPostInfoBody(firstPost),
-  //           ...this.buildTikokSourceInfoBody(firstPost),
-  //         }),
-  //       }
-  //     )
-  //   ).json();
-  //
-  //   const { url, id: videoId } = await this.uploadedVideoSuccess(
-  //     integration.profile!,
-  //     publish_id,
-  //     accessToken
-  //   );
-  //
-  //   return [
-  //     {
-  //       id: firstPost.id,
-  //       releaseURL: url,
-  //       postId: String(videoId),
-  //       status: 'success',
-  //     },
-  //   ];
-  // }
-
-  // ---------------------------------------------------------------------------
-  // NEW FILE_UPLOAD IMPLEMENTATION (no PULL_FROM_URL for videos)
-  // ---------------------------------------------------------------------------
-  // TikTok video chunk constraints: a chunk must be between 5MB and 64MB.
-  // When the whole file fits in a single chunk (<= 64MB) we upload it in one
-  // request; otherwise we split it into 10MB chunks (the final chunk carries
-  // the remainder, which TikTok allows to exceed chunk_size).
-  private static readonly TIKTOK_MAX_SINGLE_CHUNK = 64 * 1024 * 1024;
-  private static readonly TIKTOK_CHUNK_SIZE = 10 * 1024 * 1024;
-
-  private tiktokChunkPlan(videoSize: number) {
-    if (videoSize <= TiktokProvider.TIKTOK_MAX_SINGLE_CHUNK) {
-      return { chunkSize: videoSize, totalChunkCount: 1 };
-    }
-
-    const chunkSize = TiktokProvider.TIKTOK_CHUNK_SIZE;
-    return {
-      chunkSize,
-      totalChunkCount: Math.floor(videoSize / chunkSize),
-    };
-  }
-
-  // Returns a streaming body for the [start, end] byte range of the media so we
-  // never hold the whole file in memory: a ranged GET for remote URLs, a ranged
-  // read stream for local files.
-  private async tiktokChunkStream(path: string, start: number, end: number) {
-    if (path.indexOf('http') === 0) {
-      const response = await fetch(path, {
-        headers: { Range: `bytes=${start}-${end}` },
-        dispatcher: getSsrfSafeDispatcher(),
-      } as any);
-
-      // A store that ignores Range (200 with the full file) or answers with an
-      // error page would corrupt the upload at this offset.
-      if (response.status !== 206) {
-        throw new BadBody(
-          'tiktok-error-upload',
-          '{}',
-          '{}',
-          'The media storage did not return the requested byte range, please try again'
-        );
-      }
-
-      return response.body;
-    }
-
-    return createReadStream(path, { start, end });
-  }
-
-  // Streams the video bytes to the upload_url returned by the init call.
-  // We use the global fetch (not this.fetch) because chunked uploads answer
-  // with 206 (Partial Content), which this.fetch would treat as an error.
-  private async uploadTikTokVideoBytes(
-    uploadUrl: string,
-    path: string,
-    videoSize: number,
-    contentType: string
-  ) {
-    const { chunkSize, totalChunkCount } = this.tiktokChunkPlan(videoSize);
-
-    for (let i = 0; i < totalChunkCount; i++) {
-      const start = i * chunkSize;
-      const end =
-        i === totalChunkCount - 1 ? videoSize - 1 : start + chunkSize - 1;
-      const contentLength = end - start + 1;
-
-      const body = await this.tiktokChunkStream(path, start, end);
-
-      const upload = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': contentType,
-          'Content-Length': String(contentLength),
-          'Content-Range': `bytes ${start}-${end}/${videoSize}`,
-        },
-        body,
-        // Required by undici when streaming a request body.
-        duplex: 'half',
-      } as any);
-
-      if (
-        upload.status !== 200 &&
-        upload.status !== 201 &&
-        upload.status !== 206
-      ) {
-        const text = await upload.text().catch(() => '{}');
-        const handleError = this.handleErrors(text);
-        throw new BadBody(
-          'tiktok-error-upload',
-          text,
-          Buffer.from(text),
-          handleError?.value || 'Failed to upload the video to TikTok'
-        );
-      }
-    }
-  }
-
-  private buildTikokSourceInfoBody(
-    firstPost: PostDetails<TikTokDto>,
-    videoSize?: number
-  ) {
+  private buildTikokSourceInfoBody(firstPost: PostDetails<TikTokDto>) {
     const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
 
-    // TikTok photo posts only support PULL_FROM_URL, there is no FILE_UPLOAD
-    // path for photos, so this branch keeps pulling from the URL.
+    // TikTok pulls both photos and server-hosted videos from our URL.
     if (isPhoto) {
       return {
         post_mode:
@@ -787,14 +664,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       };
     }
 
-    const { chunkSize, totalChunkCount } = this.tiktokChunkPlan(videoSize || 0);
-
     return {
       source_info: {
-        source: 'FILE_UPLOAD',
-        video_size: videoSize,
-        chunk_size: chunkSize,
-        total_chunk_count: totalChunkCount,
+        source: 'PULL_FROM_URL',
+        video_url: firstPost.media?.[0]?.path,
       },
     };
   }
@@ -808,16 +681,18 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     const [firstPost] = postDetails;
     const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
     const videoPath = firstPost?.media?.[0]?.path!;
+    const ownMediaPrefix = `${process.env.FRONTEND_URL}/uploads/`;
+    if (!firstPost.media?.length || firstPost.media.some((media) => !media.path.startsWith(ownMediaPrefix))) {
+      throw new BadBody('tiktok-media', '{}', '{}', 'Upload the TikTok video to the Social library first');
+    }
 
-    // For videos we only need the total size up front (HEAD / statSync) so we
-    // can init the upload; the bytes themselves are streamed later, never fully
-    // loaded into memory.
-    const videoSize = isPhoto
-      ? undefined
-      : await this.mediaSize(videoPath, 'tiktok-error-upload');
+    const valid = await this.checkValidity([firstPost?.media || []], firstPost.settings);
+    if (valid !== true) throw new BadBody('tiktok-settings', '{}', '{}', valid);
+    const creatorValid = await this.validateDirectPost(accessToken, firstPost.settings, videoPath);
+    if (creatorValid !== true) throw new BadBody('tiktok-creator', '{}', '{}', creatorValid);
 
     const {
-      data: { publish_id, upload_url },
+      data: { publish_id },
     } = await (
       await this.fetch(
         `https://open.tiktokapis.com/v2/post/publish${this.postingMethod(
@@ -832,33 +707,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
           },
           body: JSON.stringify({
             ...this.buildTikokPostInfoBody(firstPost),
-            ...this.buildTikokSourceInfoBody(firstPost, videoSize),
+            ...this.buildTikokSourceInfoBody(firstPost),
           }),
         }
       )
     ).json();
-
-    // Videos: stream the bytes to the upload_url returned by the init call.
-    if (!isPhoto && upload_url && videoSize) {
-      try {
-        await this.uploadTikTokVideoBytes(
-          upload_url,
-          videoPath,
-          videoSize,
-          'video/mp4'
-        );
-      } catch (err) {
-        // An explicit rejection from TikTok: the post won't publish, fail it
-        if (err instanceof BadBody) {
-          throw err;
-        }
-
-        // A network error here is ambiguous - TikTok may have received all
-        // the bytes and still publish. Return pending and let checkPostStatus
-        // deliver TikTok's own verdict instead of letting the caller retry
-        // the publish.
-      }
-    }
 
     // The publish is now irreversible on TikTok's side: return `pending` so the
     // workflow polls checkPostStatus instead of blocking (and possibly timing

@@ -53,9 +53,19 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const toaster = useToaster();
   const modal = useModals();
   const [showSettings, setShowSettings] = useState(false);
+  const [tiktokCompliance, setTikTokCompliance] = useState<Record<string, boolean>>({});
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
 
   const { addEditSets, mutate, customClose, dummy } = props;
+
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const { id, valid } = (event as CustomEvent<{ id: string; valid: boolean }>).detail;
+      setTikTokCompliance((current) => ({ ...current, [id]: valid }));
+    };
+    window.addEventListener('tiktok-compliance-change', onChange);
+    return () => window.removeEventListener('tiktok-compliance-change', onChange);
+  }, []);
 
   const {
     selectedIntegrations,
@@ -89,6 +99,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       locked: state.locked,
       activateExitButton: state.activateExitButton,
     }))
+  );
+  const tiktokRequiresSettings = selectedIntegrations.some(
+    (item) => item.integration.identifier === 'tiktok' && tiktokCompliance[item.integration.id] !== true
   );
 
   useEffect(() => {
@@ -566,6 +579,17 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               <RepeatComponent repeat={repeater} onChange={setRepeater} />
             )}
           </div>
+          {selectedIntegrations.some((item) => item.integration.identifier === 'tiktok') && (
+            <p className="px-[20px] text-[13px]">
+              By posting, you agree to TikTok&apos;s <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener noreferrer">Music Usage Confirmation</a>.
+              For branded content, you also agree to the <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener noreferrer">Branded Content Policy</a>. Confirm both in TikTok settings before publishing.
+            </p>
+          )}
+          {tiktokRequiresSettings && (
+            <p className="px-[20px] text-[13px]" role="status">
+              To publish to TikTok, open its settings. Choose privacy, commercial disclosure and the required policy confirmations.
+            </p>
+          )}
           <div className="pe-[20px] flex items-center justify-end gap-[8px]">
             {existingData?.integration && (
               <button
@@ -609,10 +633,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               </button>
             )}
             {!addEditSets && (
-              <div className="group cursor-pointer relative">
+              <div className="group cursor-pointer relative" title={tiktokRequiresSettings ? 'Choose TikTok privacy, commercial disclosure and policy confirmations before publishing' : undefined}>
                 <button
                   disabled={
-                    selectedIntegrations.length === 0 || loading || locked
+                    selectedIntegrations.length === 0 || loading || locked || tiktokRequiresSettings
                   }
                   onClick={schedule('schedule')}
                   className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#1E56E8] ps-[20px] pe-[16px]"
@@ -649,7 +673,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   <button
                     onClick={schedule('now')}
                     disabled={
-                      selectedIntegrations.length === 0 || loading || locked
+                      selectedIntegrations.length === 0 || loading || locked || tiktokRequiresSettings
                     }
                     className="rounded-[8px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 hidden group-hover:flex absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner"
                   >

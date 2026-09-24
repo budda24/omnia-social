@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Delete,
   Get,
@@ -32,6 +33,7 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { uniqBy } from 'lodash';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
+import { TiktokProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -42,6 +44,24 @@ export class IntegrationsController {
     private _postService: PostsService,
     private _refreshIntegrationService: RefreshIntegrationService
   ) {}
+
+  @Get('/:id/tiktok-creator-info')
+  async getTikTokCreatorInfo(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    const integration = await this._integrationService.getIntegrationById(org.id, id);
+    if (!integration || integration.providerIdentifier !== 'tiktok') {
+      throw new BadRequestException('TikTok channel not found');
+    }
+    const provider = this._integrationManager.getSocialIntegration('tiktok') as TiktokProvider;
+    if (integration.tokenExpiration && integration.tokenExpiration.getTime() <= Date.now()) {
+      const refreshed = await this._refreshIntegrationService.refresh(integration);
+      if (!refreshed) throw new BadRequestException('Reconnect TikTok to continue');
+      return provider.creatorInfo(refreshed.accessToken);
+    }
+    return provider.creatorInfo(integration.token);
+  }
 
   @Post('/provider/:id/connect')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])

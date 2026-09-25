@@ -46,12 +46,13 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   isBetweenSteps = false;
   convertToJPEG = true;
   scopes = [
-    'video.list',
+    // Temporarily disabled until the TikTok Developer App grants these scopes.
+    // 'video.list',
     'user.info.basic',
     'video.publish',
     'video.upload',
     'user.info.profile',
-    'user.info.stats',
+    // 'user.info.stats',
   ];
   override maxConcurrentJob = 10000;
   override publishPacing = {

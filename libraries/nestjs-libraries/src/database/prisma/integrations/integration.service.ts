@@ -525,9 +525,28 @@ export class IntegrationService {
   }
 
   async deleteChannel(org: string, id: string) {
-    const out = await this._integrationRepository.deleteChannel(org, id);
-    await this._omnia.mirrorChannelById(id);
-    return out;
+    const previous = await this._integrationRepository.getIntegrationById(
+      org,
+      id
+    );
+    if (!previous) {
+      throw new HttpException('Channel not found', HttpStatus.NOT_FOUND);
+    }
+    // Erase the platform copy first. If the mirror fails, leave this channel
+    // connected so the user can retry deletion instead of leaving a live secret.
+    const mirrored = await this._omnia.mirrorChannel({
+      ...previous,
+      token: '',
+      refreshToken: null,
+      deletedAt: new Date(),
+    });
+    if (!mirrored) {
+      throw new HttpException(
+        'Channel deletion could not reach the platform',
+        HttpStatus.BAD_GATEWAY
+      );
+    }
+    return this._integrationRepository.deleteChannel(org, id);
   }
 
   async disableIntegrations(org: string, totalChannels: number) {

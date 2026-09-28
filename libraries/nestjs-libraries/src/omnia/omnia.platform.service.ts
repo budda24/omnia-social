@@ -137,7 +137,7 @@ export class OmniaPlatformService {
    * platform restart during a connect or a token refresh does not leave the
    * vault behind; after that it is a log line, not a broken connect.
    */
-  mirrorChannel(
+  async mirrorChannel(
     integration: Pick<
       Integration,
       | 'id'
@@ -158,15 +158,16 @@ export class OmniaPlatformService {
       | 'publishFreezeReason'
     >
   ) {
-    if (!OmniaPlatformService.configured) return;
+    if (!OmniaPlatformService.configured) return true;
     // A page-based provider (Facebook, LinkedIn page, YouTube…) is not a channel
     // until the page is chosen: the user-level token of step one is never mirrored.
-    if (integration.inBetweenSteps) return;
-    void (async () => {
+    if (integration.inBetweenSteps) return true;
+    return await (async () => {
       const tenantId = await this.tenantOf(integration.organizationId).catch(
-        () => null
+        () => undefined
       );
-      if (!tenantId) return; // not an Omnia-bridged workspace: nothing to mirror
+      if (tenantId === undefined) return false;
+      if (!tenantId) return true; // not an Omnia-bridged workspace: nothing to mirror
       const body = JSON.stringify({
         tenantId,
         studioOrganizationId: integration.organizationId,
@@ -199,11 +200,11 @@ export class OmniaPlatformService {
             signal: AbortSignal.timeout(8000),
             body,
           });
-          if (res.ok) return;
+          if (res.ok) return true;
           // 4xx is the platform's verdict (bad payload, unknown tenant): retrying will not change it.
           if (res.status < 500) {
             this.log.warn(`platform refused channel ${label}: ${res.status}`);
-            return;
+            return false;
           }
           this.log.warn(
             `platform answered ${res.status} for channel ${label}; retrying`
@@ -219,6 +220,7 @@ export class OmniaPlatformService {
       this.log.error(
         `channel ${label} is NOT mirrored to the platform vault after 3 attempts`
       );
+      return false;
     })();
   }
 

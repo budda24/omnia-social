@@ -682,6 +682,19 @@ export class IntegrationRepository {
       },
       data: {
         deletedAt: new Date(),
+        // Keep the row for post history, but remove credentials and account data.
+        // A new OAuth connection must create a fresh integration, not revive this one.
+        token: '',
+        refreshToken: null,
+        tokenExpiration: null,
+        internalId: `deleted_${id}`,
+        rootInternalId: null,
+        name: 'Deleted channel',
+        picture: null,
+        profile: null,
+        additionalSettings: '[]',
+        customInstanceDetails: null,
+        customerId: null,
       },
     });
   }
